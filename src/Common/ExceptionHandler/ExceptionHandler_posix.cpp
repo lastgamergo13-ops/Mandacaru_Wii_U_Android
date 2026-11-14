@@ -633,7 +633,7 @@ static void CrashDumpRegisterTargets(const PPCInterpreter_t* h)
 	}
 #if defined(__ANDROID__)
 	uint32_t sDst = 0, sSrc = 0, sBlocks = 0;
-	CrashLog_WriteLine(fmt::format("[Memoria] ultimas operacoes de DMA do Locked Cache (mais recente por ultimo): {}", LCDiag_GetRecentOps(8, sDst, sSrc, sBlocks)));
+	CrashLog_WriteLine(fmt::format("[Memoria] ultimas operacoes de DMA do Locked Cache (mais recente por ultimo): {}", LCDiag_GetRecentOps(16, sDst, sSrc, sBlocks)));
 	CrashLog_WriteLine(fmt::format("[Memoria] ultimas leituras de arquivo (mais recente por ultimo):{}", AndroidFsDiag_RecentReads(10)));
 #endif
 }

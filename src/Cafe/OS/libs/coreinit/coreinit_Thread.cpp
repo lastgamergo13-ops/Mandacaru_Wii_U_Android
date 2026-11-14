@@ -20,6 +20,7 @@
 extern std::atomic<uint32> g_diagAudioPeak, g_diagAudioCallbacks, g_diagAudioSilentCallbacks;
 void AndroidRequestFrameProbe(); // definido em Cafe/HW/Latte/Renderer/Renderer.cpp
 std::string LCDiag_GetRecentOps(uint32 maxEntries, uint32& lastStoreDst, uint32& lastStoreSrc, uint32& lastStoreBlocks); // coreinit_LockedCache.cpp
+std::string LCDiag_AnalyzeClobber(uint32 crashThread); // coreinit_LockedCache.cpp
 #endif
 #include "Cafe/OS/libs/coreinit/coreinit_Time.h"
 #include "Cafe/OS/libs/coreinit/coreinit_Alarm.h"
@@ -726,6 +727,11 @@ namespace coreinit
 			CrashLog_WriteLine(fmt::format("[Escalonador]   thread que crashou: dona da instancia PPC=\"{}\" ({:08x}) | UPIR={} | slot desse nucleo=\"{}\" -> {}",
 				AndroidWatchThreadName(owner), owner ? memory_getVirtualOffsetFromPointer(owner) : 0u, upir, AndroidWatchThreadName(slot),
 				owner == nullptr ? "dona desconhecida" : (owner == slot ? "slot CORRETO" : "slot ERRADO/NULO (esta e a causa provavel: OSGetCurrentThread devolveria outra thread)")));
+		}
+		if (hCPU)
+		{
+			OSThread_t* ownerForLc = AndroidInstanceOwner(hCPU);
+			CrashLog_WriteLine(fmt::format("[LockedCache] analise de sobreposicao: {}", LCDiag_AnalyzeClobber(ownerForLc ? memory_getVirtualOffsetFromPointer(ownerForLc) : 0)));
 		}
 		CrashLog_WriteLine(fmt::format("[Escalonador]   OSGetCurrentThread corrigidos: {} | conflitos de slot detectados: {}",
 			s_androidThreadMismatchCount.load(), s_androidSlotConflictCount.load()));

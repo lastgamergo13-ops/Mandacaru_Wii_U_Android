@@ -22,26 +22,34 @@
 #if defined(__ANDROID__)
 #include <atomic>
 #include <string>
+#include <chrono>
+#include "Cafe/OS/libs/coreinit/coreinit_Thread.h"
 // DIAGNOSTICO: anel com as ultimas operacoes de DMA do Locked Cache (o alocador de objetos pequenos do Watch Dogs move os descritores dos
 // pools por LCLoadDMABlocks/LCStoreDMABlocks). O vigia de memoria (coreinit_Thread.cpp) usa isto ao detectar um ponteiro corrompido.
 struct LcDiagOp
 {
 	std::atomic<uint32> seq{0};
 	uint32 isStore = 0, core = 0, dst = 0, src = 0, blocks = 0;
+	uint32 thread = 0; // MPTR da OSThread que fez a operacao
+	uint64 ns = 0;     // relogio monotonico
 };
-static LcDiagOp g_lcDiagRing[16];
+static constexpr uint32 kLcDiagRingSize = 64;
+static LcDiagOp g_lcDiagRing[kLcDiagRingSize];
 static std::atomic<uint32> g_lcDiagCounter{0};
 static std::atomic<uint32> g_lcDiagLastStoreDst{0}, g_lcDiagLastStoreSrc{0}, g_lcDiagLastStoreBlocks{0};
 
 static void LcDiagRecord(bool isStore, uint32 core, uint32 dst, uint32 src, uint32 blocks)
 {
 	const uint32 n = ++g_lcDiagCounter;
-	LcDiagOp& e = g_lcDiagRing[n % 16];
+	LcDiagOp& e = g_lcDiagRing[n % kLcDiagRingSize];
 	e.isStore = isStore ? 1 : 0;
 	e.core = core;
 	e.dst = dst;
 	e.src = src;
 	e.blocks = blocks;
+	coreinit::OSThread_t* t = coreinit::OSGetCurrentThread();
+	e.thread = t ? memory_getVirtualOffsetFromPointer(t) : 0;
+	e.ns = (uint64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	e.seq = n;
 	if (isStore)
 	{
@@ -51,22 +59,76 @@ static void LcDiagRecord(bool isStore, uint32 core, uint32 dst, uint32 src, uint
 	}
 }
 
-// texto com as ultimas operacoes (mais recente por ultimo) e os dados da ultima Store
+static std::string LcDiagThreadName(uint32 mptr)
+{
+	if (mptr == 0)
+		return "-";
+	if (mptr < 0x01000000u || mptr >= 0x50000000u || !memory_isAddressRangeAccessible(mptr, sizeof(coreinit::OSThread_t)))
+		return "?";
+	return coreinit::__OSSafeThreadName(MEMPTR<coreinit::OSThread_t>(mptr).GetPtr());
+}
+
+// texto com as ultimas operacoes (mais recente por ultimo), com a thread que fez cada uma, e os dados da ultima Store
 std::string LCDiag_GetRecentOps(uint32 maxEntries, uint32& lastStoreDst, uint32& lastStoreSrc, uint32& lastStoreBlocks)
 {
 	lastStoreDst = g_lcDiagLastStoreDst;
 	lastStoreSrc = g_lcDiagLastStoreSrc;
 	lastStoreBlocks = g_lcDiagLastStoreBlocks;
 	const uint32 total = g_lcDiagCounter.load();
-	uint32 n = total < 16 ? total : 16;
+	uint32 n = total < kLcDiagRingSize ? total : kLcDiagRingSize;
 	if (n > maxEntries)
 		n = maxEntries;
+	const uint64 lastNs = total ? g_lcDiagRing[total % kLcDiagRingSize].ns : 0;
 	std::string out;
 	for (uint32 i = total - n + 1; i <= total && n > 0; i++)
 	{
-		const LcDiagOp& e = g_lcDiagRing[i % 16];
-		out += fmt::format("{}(nucleo{} destino={:08x} origem={:08x} blocos={}) ", e.isStore ? "Store" : "Load", e.core, e.dst, e.src, e.blocks);
+		const LcDiagOp& e = g_lcDiagRing[i % kLcDiagRingSize];
+		out += fmt::format("{}(nucleo{} destino={:08x} origem={:08x} blocos={} por \"{}\" -{:.2f}ms) ", e.isStore ? "Store" : "Load", e.core, e.dst, e.src, e.blocks,
+			LcDiagThreadName(e.thread), (double)(lastNs - e.ns) / 1.0e6);
 	}
+	return out;
+}
+
+// Depois da ULTIMA Load da thread que crashou (crashThread, MPTR da OSThread), alguma OUTRA thread usou a MESMA area do Locked Cache do mesmo
+// nucleo? Se sim, ela pode ter sobrescrito os dados que a thread que crashou ainda ia ler (o Locked Cache e privado por nucleo, mas
+// compartilhado entre as threads que rodam naquele nucleo).
+std::string LCDiag_AnalyzeClobber(uint32 crashThread)
+{
+	const uint32 total = g_lcDiagCounter.load();
+	const uint32 n = total < kLcDiagRingSize ? total : kLcDiagRingSize;
+	uint32 loadIdx = 0;
+	for (uint32 i = total; i + n > total && i > 0; i--)
+	{
+		const LcDiagOp& e = g_lcDiagRing[i % kLcDiagRingSize];
+		if (e.seq == i && e.thread == crashThread && !e.isStore)
+		{
+			loadIdx = i;
+			break;
+		}
+	}
+	if (loadIdx == 0)
+		return "nenhuma Load recente da thread que crashou no anel (a thread nao usou DMA do Locked Cache nas ultimas operacoes)";
+	const LcDiagOp& L = g_lcDiagRing[loadIdx % kLcDiagRingSize];
+	const uint32 lo = L.dst, hi = L.dst + L.blocks * 32;
+	std::string out = fmt::format("ultima Load da thread que crashou: #{} nucleo{} destino={:08x}..{:08x} origem={:08x}. ", loadIdx, L.core, lo, hi, L.src);
+	uint32 clobbers = 0, others = 0;
+	for (uint32 j = loadIdx + 1; j <= total; j++)
+	{
+		const LcDiagOp& e = g_lcDiagRing[j % kLcDiagRingSize];
+		if (e.seq != j || e.core != L.core || e.thread == crashThread)
+			continue;
+		others++;
+		const uint32 elo = e.dst, ehi = e.dst + e.blocks * 32;
+		const uint32 slo = e.isStore ? e.src : e.dst, shi = slo + e.blocks * 32; // area do Locked Cache tocada pela operacao
+		(void)elo; (void)ehi;
+		if (slo < hi && shi > lo)
+		{
+			clobbers++;
+			out += fmt::format("[SOBREPOE #{} {} por \"{}\" LC={:08x}..{:08x} -{:.2f}ms apos a Load] ", j, e.isStore ? "Store" : "Load", LcDiagThreadName(e.thread), slo, shi,
+				(double)(e.ns - L.ns) / 1.0e6);
+		}
+	}
+	out += fmt::format("=> outras threads no mesmo nucleo depois da Load: {} operacao(oes), {} sobrepoe(m) a area.", others, clobbers);
 	return out;
 }
 #endif
