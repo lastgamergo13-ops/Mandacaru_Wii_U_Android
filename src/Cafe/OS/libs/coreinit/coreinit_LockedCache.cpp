@@ -47,7 +47,7 @@ static void LcDiagRecord(bool isStore, uint32 core, uint32 dst, uint32 src, uint
 	e.dst = dst;
 	e.src = src;
 	e.blocks = blocks;
-	coreinit::OSThread_t* t = coreinit::OSGetCurrentThread();
+	OSThread_t* t = coreinit::OSGetCurrentThread();
 	e.thread = t ? memory_getVirtualOffsetFromPointer(t) : 0;
 	e.ns = (uint64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	e.seq = n;
@@ -63,9 +63,9 @@ static std::string LcDiagThreadName(uint32 mptr)
 {
 	if (mptr == 0)
 		return "-";
-	if (mptr < 0x01000000u || mptr >= 0x50000000u || !memory_isAddressRangeAccessible(mptr, sizeof(coreinit::OSThread_t)))
+	if (mptr < 0x01000000u || mptr >= 0x50000000u || !memory_isAddressRangeAccessible(mptr, sizeof(OSThread_t)))
 		return "?";
-	return coreinit::__OSSafeThreadName(MEMPTR<coreinit::OSThread_t>(mptr).GetPtr());
+	return coreinit::__OSSafeThreadName(MEMPTR<OSThread_t>(mptr).GetPtr());
 }
 
 // texto com as ultimas operacoes (mais recente por ultimo), com a thread que fez cada uma, e os dados da ultima Store
