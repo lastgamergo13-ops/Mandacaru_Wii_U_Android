@@ -4,6 +4,8 @@
 #include "PPCRecompilerIml.h"
 #include "Cafe/GameProfile/GameProfile.h"
 #include "IML/IML.h"
+#include "Common/DiagnosticsFlags.h"
+#include <atomic>
 
 ATTR_MS_ABI double frsqrte_espresso(double input);
 ATTR_MS_ABI double fres_espresso(double input);
@@ -814,6 +816,17 @@ void PPCRecompilerImlGen_EmitPSQLoadCase(ppcImlGenContext_t* ppcImlGenContext, s
 // PSQ_L and PSQ_LU
 bool PPCRecompilerImlGen_PSQ_L(ppcImlGenContext_t* ppcImlGenContext, uint32 opcode, bool withUpdate)
 {
+#if defined(__ANDROID__)
+	// Mandacaru (TESTE, aba Logs e Diagnostico > "JIT: paired single quantizado no interpretador"): devolver false marca a funcao inteira como
+	// nao recompilavel, e ela roda no interpretador. Serve para descobrir se o JIT grava/le dado quantizado (u8/s8/u16/s16) errado.
+	if (Diag::IsEnabled(Diag::Flag::JitNoPsq))
+	{
+		static std::atomic<bool> s_logged{false};
+		if (!s_logged.exchange(true))
+			cemuLog_log(LogType::Force, "[Diag] JIT: funcoes com psq_l/psq_* rodam no INTERPRETADOR (aba Logs e Diagnostico)");
+		return false;
+	}
+#endif
 	int rA, frD;
 	uint32 immUnused;
 	PPC_OPC_TEMPL_D_SImm(opcode, frD, rA, immUnused);
@@ -949,6 +962,17 @@ void PPCRecompilerImlGen_EmitPSQStoreCase(ppcImlGenContext_t* ppcImlGenContext, 
 // PSQ_ST and PSQ_STU
 bool PPCRecompilerImlGen_PSQ_ST(ppcImlGenContext_t* ppcImlGenContext, uint32 opcode, bool withUpdate)
 {
+#if defined(__ANDROID__)
+	// Mandacaru (TESTE, aba Logs e Diagnostico > "JIT: paired single quantizado no interpretador"): devolver false marca a funcao inteira como
+	// nao recompilavel, e ela roda no interpretador. Serve para descobrir se o JIT grava/le dado quantizado (u8/s8/u16/s16) errado.
+	if (Diag::IsEnabled(Diag::Flag::JitNoPsq))
+	{
+		static std::atomic<bool> s_logged{false};
+		if (!s_logged.exchange(true))
+			cemuLog_log(LogType::Force, "[Diag] JIT: funcoes com psq_st/psq_* rodam no INTERPRETADOR (aba Logs e Diagnostico)");
+		return false;
+	}
+#endif
 	int rA, frD;
 	uint32 immUnused;
 	PPC_OPC_TEMPL_D_SImm(opcode, frD, rA, immUnused);

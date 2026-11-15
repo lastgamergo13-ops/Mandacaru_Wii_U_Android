@@ -55,6 +55,7 @@ namespace Diag
 		SleepFloorOff = 28, // DESLIGA o piso de 100 us do OSSleepTicks (que agora vem LIGADO por padrao)
 		LockedCacheOff = 29, // TESTE: LCHardwareIsAvailable() devolve false (o jogo pode escolher o caminho sem Locked Cache)
 		VkFreeIdleEarly = 30, // TESTE: libera buffers de upload do Vulkan ociosos mais cedo (menos RAM). Desligado = comportamento original
+		JitNoPsq = 31, // TESTE: funcoes com psq_l/psq_st (paired single quantizado) rodam no INTERPRETADOR
 		// REGRA: ao adicionar uma opcao, use o proximo numero e mantenha "Count" SEMPRE por ultimo.
 		Count
 	};
@@ -94,6 +95,7 @@ namespace Diag
 		case Flag::SleepFloorOff: return "diag_sleep_floor_off";
 		case Flag::LockedCacheOff: return "diag_locked_cache_off";
 		case Flag::VkFreeIdleEarly: return "diag_vk_free_idle_early";
+		case Flag::JitNoPsq: return "diag_jit_no_psq";
 		default: return "diag_unknown";
 		}
 	}

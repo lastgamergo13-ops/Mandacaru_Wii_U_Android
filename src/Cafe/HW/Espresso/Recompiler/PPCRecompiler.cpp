@@ -606,7 +606,8 @@ void PPCRecompiler_recompileAtAddress(uint32 address)
 	// for a full recompile (see PPCRecompilerCache.h for the safety details - relocations
 	// are always re-patched for this run before a cached function is ever used)
 	bool loadedFromCache = false;
-	PPCRecFunction_t* func = PPCRecompilerCache_TryLoad(range, functionEntryPoints);
+	// Mandacaru: com o teste JitNoPsq o cache AOT e ignorado (funcoes com psq ja gravadas continuariam no JIT e invalidariam o teste)
+	PPCRecFunction_t* func = Diag::IsEnabled(Diag::Flag::JitNoPsq) ? nullptr : PPCRecompilerCache_TryLoad(range, functionEntryPoints);
 	if (func)
 		loadedFromCache = true;
 	else

@@ -322,6 +322,18 @@ fun LogsSettingsScreen(navigateBack: () -> Unit) {
             ),
         )
         Toggle(
+            label = tr("JIT: paired single quantizado no interpretador (teste)"),
+            description = tr(
+                "O Watch Dogs crasha lendo dados de visibilidade que parecem ter sido gravados errado (padrao repetido de 16 bytes, tipico de dado " +
+                        "quantizado em 8 bits). Com esta chave ligada, toda funcao do jogo que usa psq_l/psq_st (paired single quantizado) roda " +
+                        "no INTERPRETADOR em vez do JIT, e o cache AOT e ignorado. Fica bem mais lento no inicio. Se o crash sumir, o JIT esta " +
+                        "gravando ou lendo dado quantizado errado. Desligado = normal. Vale no proximo jogo que voce abrir. No log aparece " +
+                        "\"[Diag] JIT: funcoes com psq_l/psq_*\"."
+            ),
+            initialCheckedState = { NativeSettings.getDiagFlag(NativeSettings.DiagFlag.JIT_NO_PSQ) },
+            onCheckedChanged = { NativeSettings.setDiagFlag(NativeSettings.DiagFlag.JIT_NO_PSQ, it) },
+        )
+        Toggle(
             label = tr("Liberar buffers de upload do Vulkan mais cedo (menos RAM)"),
             description = tr(
                 "Depois de carregar o mundo, o Vulkan guarda dezenas de buffers de upload de 32 MB (ate ~2 GB de RAM no Watch Dogs), " +

@@ -81,6 +81,7 @@ object NativeSettings {
         const val SLEEP_FLOOR_OFF = 28
         const val LOCKED_CACHE_OFF = 29
         const val VK_FREE_IDLE_EARLY = 30
+        const val JIT_NO_PSQ = 31
     }
 
     @JvmStatic
