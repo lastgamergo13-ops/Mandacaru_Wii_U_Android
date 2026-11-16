@@ -236,7 +236,12 @@ void PPCInterpreter_FCTIWZ(PPCInterpreter_t* hCPU, uint32 Opcode)
 
 	double b = hCPU->fpr[frB].fpr;
 	uint64 v;
-	if (b > (double)0x7FFFFFFF)
+	if (b != b)
+	{
+		// CORRECAO (ARM x x86): NaN -> 0x80000000 como no PowerPC; (sint32)NaN no ARM da 0 (comportamento indefinido em C++)
+		v = (uint64)0x80000000;
+	}
+	else if (b > (double)0x7FFFFFFF)
 	{
 		v = (uint64)0x7FFFFFFF;
 	}
@@ -266,7 +271,11 @@ void PPCInterpreter_FCTIW(PPCInterpreter_t* hCPU, uint32 Opcode)
 
 	double b = hCPU->fpr[frB].fpr;
 	uint64 v;
-	if (b > (double)0x7FFFFFFF)
+	if (b != b)
+	{
+		v = (uint64)0x80000000; // CORRECAO (ARM x x86): NaN -> 0x80000000 como no PowerPC
+	}
+	else if (b > (double)0x7FFFFFFF)
 	{
 		v = (uint64)0x7FFFFFFF;
 	}

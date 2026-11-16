@@ -1221,6 +1221,11 @@ std::string PPCRecompiler_getRecentHleCallsString(uint32 maxEntries)
 	return out;
 }
 
+#if defined(__ANDROID__)
+bool AndroidHleCensus_Count(uint32 hleFuncId, PPCInterpreter_t* hCPU, uint32* args);          // PPCInterpreterHLE.cpp
+void AndroidHleCensus_LogFirst(uint32 hleFuncId, PPCInterpreter_t* hCPU, const uint32* args); // PPCInterpreterHLE.cpp
+#endif
+
 void* PPCRecompiler_virtualHLE(PPCInterpreter_t* ppcInterpreter, uint32 hleFuncId)
 {
 	if (hleFuncId != 0xFFD0)
@@ -1245,7 +1250,15 @@ void* PPCRecompiler_virtualHLE(PPCInterpreter_t* ppcInterpreter, uint32 hleFuncI
 	{
 		auto hleCall = PPCInterpreter_getHLECall(hleFuncId);
 		cemu_assert(hleCall != nullptr);
+#if defined(__ANDROID__)
+		uint32 censusArgs[4];
+		const bool censusFirst = AndroidHleCensus_Count(hleFuncId, ppcInterpreter, censusArgs);
+#endif
 		hleCall(ppcInterpreter);
+#if defined(__ANDROID__)
+		if (censusFirst)
+			AndroidHleCensus_LogFirst(hleFuncId, ppcInterpreter, censusArgs);
+#endif
 	}
 	ppcInterpreter->rspTemp = prevRSPTemp;
 	// IMPORTANTE: o código JIT gerado (macro() logo abaixo, case PPCREC_IML_MACRO_HLE) pega
@@ -1740,7 +1753,14 @@ void AArch64GenContext_t::fpr_r_r(IMLInstruction* imlInstruction)
 
 	if (imlInstruction->operation == PPCREC_IML_OP_FPR_FLOAT_TO_INT)
 	{
-		fcvtzs(gpReg<WReg>(imlRegR), fpReg<DReg>(imlRegA));
+		WReg wDst = gpReg<WReg>(imlRegR);
+		DReg dSrc = fpReg<DReg>(imlRegA);
+		fcvtzs(wDst, dSrc);
+		// CORRECAO (ARM x x86): no PowerPC (e no x86) converter NaN para inteiro da 0x80000000; o fcvtzs do ARM da 0. O jogo usa esse
+		// valor como "invalido/negativo" (Watch Dogs: contagem do laco de MergeVisibleNodes). Entrada NaN = comparacao nao ordenada = flag V.
+		fcmp(dSrc, dSrc);
+		movz(TEMP_GPR1.WReg, 0x8000, 16);
+		csel(wDst, TEMP_GPR1.WReg, wDst, Cond::VS);
 		return;
 	}
 	else if (imlInstruction->operation == PPCREC_IML_OP_FPR_INT_TO_FLOAT)
@@ -1797,6 +1817,14 @@ void AArch64GenContext_t::fpr_r_r(IMLInstruction* imlInstruction)
 	else if (imlInstruction->operation == PPCREC_IML_OP_FPR_FCTIWZ)
 	{
 		fcvtzs(regR, regA);
+		// CORRECAO (ARM x x86): fctiwz de NaN deve dar 0x80000000 (int32 minimo); o fcvtzs do ARM da 0. Mantemos o resultado de 64 bits
+		// com sinal estendido, igual ao que o fcvtzs daria para esse valor.
+		fmov(TEMP_GPR1.XReg, regR);
+		fcmp(regA, regA);
+		movz(TEMP_GPR2.WReg, 0x8000, 16);
+		sxtw(TEMP_GPR2.XReg, TEMP_GPR2.WReg);
+		csel(TEMP_GPR1.XReg, TEMP_GPR2.XReg, TEMP_GPR1.XReg, Cond::VS);
+		fmov(regR, TEMP_GPR1.XReg);
 	}
 	else
 	{
