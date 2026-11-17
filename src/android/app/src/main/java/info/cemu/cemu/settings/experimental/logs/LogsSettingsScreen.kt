@@ -322,6 +322,17 @@ fun LogsSettingsScreen(navigateBack: () -> Unit) {
             ),
         )
         Toggle(
+            label = tr("Nao montar o DLC do jogo (teste)"),
+            description = tr(
+                "O log mostra o jogo base na versao 0 (sem atualizacao) com um DLC v16 montado junto. Essa combinacao pode deixar os dados do " +
+                        "mundo inconsistentes com o codigo do jogo. Com esta chave ligada o DLC nao e montado (o jogo ve 'sem DLC'). E um TESTE: " +
+                        "se o crash sumir, o DLC era a causa. Desligado = normal. Vale no proximo jogo que voce abrir. No log aparece " +
+                        "\"[Diag] DLC ignorado\"."
+            ),
+            initialCheckedState = { NativeSettings.getDiagFlag(NativeSettings.DiagFlag.NO_DLC) },
+            onCheckedChanged = { NativeSettings.setDiagFlag(NativeSettings.DiagFlag.NO_DLC, it) },
+        )
+        Toggle(
             label = tr("JIT: paired single quantizado no interpretador (teste)"),
             description = tr(
                 "O Watch Dogs crasha lendo dados de visibilidade que parecem ter sido gravados errado (padrao repetido de 16 bytes, tipico de dado " +

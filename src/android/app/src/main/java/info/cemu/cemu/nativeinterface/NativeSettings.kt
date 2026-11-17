@@ -82,6 +82,7 @@ object NativeSettings {
         const val LOCKED_CACHE_OFF = 29
         const val VK_FREE_IDLE_EARLY = 30
         const val JIT_NO_PSQ = 31
+        const val NO_DLC = 32
     }
 
     @JvmStatic

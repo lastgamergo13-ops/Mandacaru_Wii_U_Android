@@ -811,6 +811,15 @@ namespace CafeSystem
 			cemuLog_log(LogType::Force, "Update: Not present");
 		// check AOC
 		auto aocList = sGameInfo_ForegroundTitle.GetAOC();
+#if defined(__ANDROID__)
+		// Mandacaru (TESTE, aba Logs e Diagnostico > "Nao montar o DLC do jogo"): ignora o DLC. A lista de DLC que o jogo ve (nn_aoc) vem do
+		// diretorio /vol, entao sem montar nada o jogo tambem ve "sem DLC".
+		if (!aocList.empty() && Diag::IsEnabled(Diag::Flag::NoDlc))
+		{
+			cemuLog_log(LogType::Force, "[Diag] DLC ignorado (aba Logs e Diagnostico): {}", aocList[0].GetPrintPath());
+			aocList.clear();
+		}
+#endif
 		if (!aocList.empty())
 		{
 			// todo - support for multi-title AOC
@@ -850,6 +859,10 @@ namespace CafeSystem
             }
         }
         auto aocList = sGameInfo_ForegroundTitle.GetAOC();
+#if defined(__ANDROID__)
+        if (Diag::IsEnabled(Diag::Flag::NoDlc))
+            aocList.clear(); // nada foi montado
+#endif
         if (!aocList.empty())
         {
             TitleInfo& titleAOC = aocList[0];
