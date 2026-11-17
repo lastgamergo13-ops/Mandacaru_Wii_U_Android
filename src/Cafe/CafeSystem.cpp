@@ -817,7 +817,7 @@ namespace CafeSystem
 		if (!aocList.empty() && Diag::IsEnabled(Diag::Flag::NoDlc))
 		{
 			cemuLog_log(LogType::Force, "[Diag] DLC ignorado (aba Logs e Diagnostico): {}", aocList[0].GetPrintPath());
-			aocList.clear();
+			aocList = aocList.first(0); // GetAOC() devolve std::span (nao tem clear()): span vazio
 		}
 #endif
 		if (!aocList.empty())
@@ -861,7 +861,7 @@ namespace CafeSystem
         auto aocList = sGameInfo_ForegroundTitle.GetAOC();
 #if defined(__ANDROID__)
         if (Diag::IsEnabled(Diag::Flag::NoDlc))
-            aocList.clear(); // nada foi montado
+            aocList = aocList.first(0); // GetAOC() devolve std::span (nao tem clear()): span vazio // nada foi montado
 #endif
         if (!aocList.empty())
         {
