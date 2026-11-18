@@ -1046,18 +1046,31 @@ bool PipelineCompiler::Compile(bool forceCompile, bool isRenderThread, bool show
 			cemuLog_log(LogType::Force, "[Quarentena] pipeline VS={:016x} PS={:016x} GS={:016x} PULADO (derrubou o driver antes)", pcHashes[0], pcHashes[1], pcHashes[2]);
 			return true; // true = o chamador nao tenta compilar de novo
 		}
+#if defined(__ANDROID__)
+		// Todas as criacoes de pipeline sao serializadas por um mutex global (protecao contra crash do driver). CORRECAO: a thread de RENDER
+		// (tentativa sem compilar, flag FAIL_ON_PIPELINE_COMPILE_REQUIRED) nao pode esperar nesse mutex: quando uma thread assincrona leva ~12 s
+		// compilando um shader pesado (visto no log: tempo=12067ms), a thread de render ficava bloqueada o tempo todo e o jogo caia para
+		// 0,28 fps. Se o mutex estiver ocupado, devolvemos "precisa compilar" (false), o mesmo resultado de um pipeline ainda nao compilado: o
+		// chamador enfileira a compilacao assincrona e pula este desenho ate ela terminar.
+		std::unique_lock<std::mutex> createLock(g_vkCreatePipelineMutex, std::defer_lock);
+		if (!forceCompile && isRenderThread)
+		{
+			if (!createLock.try_lock())
+				return false;
+		}
+		else
+		{
+			createLock.lock();
+		}
+#endif
 		const auto pcT0 = std::chrono::steady_clock::now();
 		if (pcHaveHashes)
 			PIPE_CREATE_BEGIN(pcHashes[0], pcHashes[1], pcHashes[2]);
-#if defined(__ANDROID__)
-		{
-			std::lock_guard<std::mutex> createLock(g_vkCreatePipelineMutex);
-			result = vkCreateGraphicsPipelines(vkRenderer->m_logicalDevice, vkRenderer->m_pipeline_cache, 1, &pipelineInfo, nullptr, &pipeline);
-		}
-#else
 		result = vkCreateGraphicsPipelines(vkRenderer->m_logicalDevice, vkRenderer->m_pipeline_cache, 1, &pipelineInfo, nullptr, &pipeline);
-#endif
 		PIPE_CREATE_END();
+#if defined(__ANDROID__)
+		createLock.unlock();
+#endif
 		const auto pcMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - pcT0).count();
 		// V11.37: a hora desta linha (fim da criacao) deve bater com "AdrenoVK ... Shader compilation failed" no logcat
 		cemuLog_log(LogType::Force, "[Pipeline] criado VS={:016x} PS={:016x} GS={:016x} resultado={} tempo={}ms thread={}", pcHashes[0], pcHashes[1], pcHashes[2], (sint32)result, (long long)pcMs, isRenderThread ? "render" : "async");

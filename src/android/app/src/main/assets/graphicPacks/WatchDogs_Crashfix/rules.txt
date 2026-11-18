@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 0005000010142000
+name = Crash fix - MergeVisibleNodes (jogo base v0)
+path = "Watch Dogs/Workarounds/Crash fix MergeVisibleNodes"
+description = Contorno para o crash em MergeVisibleNodesGPUVisibilityLCDMA (ponteiro invalido no mundo aberto) no jogo base v0 sem atualizacao. A funcao passa a retornar imediatamente sem processar os nos visiveis para a GPU. Efeito colateral possivel: objetos do mundo podem nao aparecer ou piscar. Feito para o modulo duniademo com checksum 0x7BC6F16F.
+version = 7

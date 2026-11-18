@@ -1,3 +1,4 @@
+#include <atomic>
 #include "Cafe/HW/Latte/Core/FrameGenSettings.h"
 #include "Cafe/HW/Latte/ISA/RegDefines.h"
 
@@ -225,6 +226,14 @@ void LatteMRT::BindDepthBufferOnly(LatteTextureView* view)
 LatteTextureView* LatteMRT_CreateDepthBuffer(MPTR depthBufferPhysMem, uint32 width, uint32 height, uint32 pitch, Latte::E_HWTILEMODE tileMode, Latte::E_GX2SURFFMT format, uint32 swizzle, sint32 viewSlice)
 {
 	LatteTextureView* textureView = LatteTexture_CreateMapping(depthBufferPhysMem, MPTR_NULL, width, height, viewSlice+1, pitch, tileMode, swizzle, 0, 1, viewSlice, 1, format, viewSlice > 0 ? Latte::E_DIM::DIM_2D_ARRAY : Latte::E_DIM::DIM_2D, Latte::E_DIM::DIM_2D, true);
+#if defined(__ANDROID__)
+	// Mandacaru: lista os ALVOS DE RENDER (profundidade) criados, com tamanho/formato: base para montar graphic packs de resolucao.
+	{
+		static std::atomic<uint32> s_rtLogCount{0};
+		if (s_rtLogCount.fetch_add(1) < 400)
+			cemuLog_log(LogType::Force, "[RT] novo alvo de PROFUNDIDADE {}x{} formato=0x{:x} tile={} pitch={} slice={}", width, height, (uint32)format, (uint32)tileMode, pitch, viewSlice);
+	}
+#endif
 	LatteMRT::SetDepthAndStencilAttachment(textureView, textureView->baseTexture->hasStencil);
 	return textureView;
 }
@@ -306,6 +315,13 @@ LatteTextureView* LatteMRT::GetColorAttachmentTexture(uint32 index, bool createN
 	{
 		// create color buffer view
 		colorBufferView = LatteTexture_CreateMapping(colorBufferPhysMem, 0, colorBufferWidth, colorBufferHeight, (viewFirstSlice + viewNumSlices), colorBufferPitch, colorBufferTileMode, colorBufferSwizzle>>8, viewFirstMip, 1, viewFirstSlice, viewNumSlices, (Latte::E_GX2SURFFMT)colorBufferFormat, (viewFirstSlice + viewNumSlices)>1? Latte::E_DIM::DIM_2D_ARRAY: Latte::E_DIM::DIM_2D, Latte::E_DIM::DIM_2D, false, true);
+#if defined(__ANDROID__)
+		{
+			static std::atomic<uint32> s_rtColorLogCount{0};
+			if (s_rtColorLogCount.fetch_add(1) < 400)
+				cemuLog_log(LogType::Force, "[RT] novo alvo de COR #{} {}x{} formato=0x{:x} tile={} pitch={} slices={}", index, colorBufferWidth, colorBufferHeight, (uint32)colorBufferFormat, (uint32)colorBufferTileMode, colorBufferPitch, (viewFirstSlice + viewNumSlices));
+		}
+#endif
 		LatteGPUState.repeatTextureInitialization = true;
 		checkForTextureChanges = false;
 	}
