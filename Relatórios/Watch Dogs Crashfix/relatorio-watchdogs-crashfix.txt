@@ -1,0 +1,237 @@
+RELATORIO: COMO O WATCH DOGS (USA, v0) PASSOU A RODAR NO MANDACARU CEMU ANDROID
+================================================================================
+Registro do trabalho de depuracao feito com os logs enviados (varias dezenas de
+rodadas). Documenta o CRASHFIX, tudo que foi corrigido para chegar a ele, o que
+foi testado e descartado, e o que ainda esta em aberto.
+
+Regra deste relatorio: cada afirmacao esta marcada como
+   [PROVADO]    = confirmado por logs/testes comparativos
+   [HIPOTESE]   = explicacao plausivel, NAO provada
+   [DESCARTADO] = testado e nao era a causa
+Este arquivo deve ser atualizado a cada nova correcao.
+
+Ambiente: jogo "WATCH_DOGS (USA).wua" base v0 (0005000010142000_v0), SEM
+atualizacao ("Update: Not present"), DLC v16 presente. Modulo duniademo com
+checksum 0x7BC6F16F (hash do RPX 95fd128b). Vulkan com driver Turnip.
+
+
+1. RESUMO CURTO
+--------------------------------------------------------------------------------
+O jogo nao abria de forma estavel por QUATRO problemas independentes, corrigidos
+em ordem:
+
+  1) Heap desalinhado (base da memoria do Wii U so alinhada a 4 KB)   [PROVADO]
+  2) Corrida de inicializacao (thread de arquivos x Main Thread)      [PROVADO]
+  3) Driver Turnip v26.3.0-R6 derruba o app no vkQueueSubmit          [PROVADO]
+  4) Crash no mundo aberto em MergeVisibleNodesGPUVisibilityLCDMA     [CONTORNADO]
+
+O item 4 NAO foi corrigido na causa: foi contornado por um graphic pack que faz
+a funcao retornar imediatamente (WatchDogs_Crashfix). Com ele o jogo parou de
+cair nessa funcao e passou a desenhar o mundo. Ver secoes 5 e 9.
+
+
+2. CORRECAO 1: HEAP DESALINHADO (MMU.cpp)                           [PROVADO]
+--------------------------------------------------------------------------------
+Sintoma: crashes aleatorios no inicio, cada rodada diferente (texto "ryAr",
+"ourc", ponteiro nulo em 0x494, valor 919429da).
+
+Causa: o Watch Dogs pede MEMAllocFromExpHeapEx com alinhamento de 128 KB. O
+codigo do Cemu alinha o ENDERECO DO HOST, mas o jogo ve o endereco do Wii U
+(host - memory_base). No Android o mmap devolvia memory_base alinhada so a 4 KB e
+diferente a cada execucao, entao o jogo recebia um endereco que nao era multiplo
+de 128 KB. O alocador do jogo deduz estruturas por mascara de endereco e
+corrompia as proprias listas livres.
+
+Prova: em 7 de 7 logs, (base do host + endereco do heap) era multiplo de 128 KB.
+O tipo de crash acompanhava o endereco devolvido pelo heap.
+
+Correcao: em src/Cafe/HW/MMU/MMU.cpp (so Linux/Android) a reserva de 4 GB passou
+a ser 4 GB + 256 MB, com a base alinhada a 256 MB (sobras devolvidas ao sistema).
+Log de confirmacao: "[Mem] memory_base=... alinhada a 256 MB" e
+"[Heap] MEMAllocFromExpHeapEx(...) -> 0x12b00000 [alinhado OK]".
+Tambem foi adicionada a verificacao de alinhamento no log do heap
+(coreinit_MEM_ExpHeap.cpp).
+
+
+3. CORRECAO 2: CORRIDA DE INICIALIZACAO                             [PROVADO]
+--------------------------------------------------------------------------------
+Sintoma: crash de ponteiro nulo em CNomadArchiveManager::InitArchiveCache /
+HasPendingRequests (CDelayedArchivesOpenThread).
+
+Causa: a CDelayedArchivesOpenThread usa o objeto global CRequestManager
+(0x10875D04) antes de a Main Thread criar a DecompressionThread e preenche-lo. No
+Wii U real os nucleos rodam em paralelo e a Main Thread chega primeiro; no
+emulador a leitura de arquivos nao tem latencia e a thread de arquivos passa na
+frente.
+
+Prova: com um atraso de 100 ms na partida dessa thread o jogo entrou em 7 de 7
+rodadas; sem o atraso crashou em 4 de 4 (multi-core e single-core), com qualquer
+quantum de thread.
+
+Correcao (coreinit_Thread.cpp, AndroidThreadStartDelay), LIGADA POR PADRAO:
+  - multi-core: sleep de 100 ms so desta thread;
+  - single-core: sleep do host trava todos os nucleos (nao funciona), entao dorme
+    em TEMPO DO JOGO (OSSleepTicks, 100 ms).
+So afeta a thread "CDelayedArchivesOpenThread". Chave na aba Logs e Diagnostico:
+"Desligar o atraso de partida da thread de arquivos".
+
+
+4. CORRECAO 3: DRIVER VULKAN                                        [PROVADO]
+--------------------------------------------------------------------------------
+Sintoma: crash da LatteThread em vkQueueSubmit (endereco nulo + 0x1b0, dentro do
+driver), logo no comeco.
+
+Prova: TODOS os logs com Turnip v26.3.0-R6 (Mesa 26.3.0) crasharam assim (10 de
+10); NENHUM log com Turnip v27.0.0-R2 (Mesa 27.0.0) teve esse crash.
+Acao: usar Turnip_v27.0.0-R2-Oneui. Sem mudanca de codigo.
+
+
+5. O CRASHFIX (graphic pack WatchDogs_Crashfix)                     [CONTORNO]
+--------------------------------------------------------------------------------
+Crash: MergeVisibleNodesGPUVisibilityLCDMA(JobScheduler2::CStreamSplitter&)
++0x6d4, nas threads CJobScheduler2Thread_N, 1 a 6 minutos depois da cena do
+mundo. O jogo calcula um ponteiro invalido (ex.: r6 = 0x24b6ddb6 lido do Locked
+Cache) e acessa memoria que nao existe. O laco percorre blocos de 1 KB do array
+de nos visiveis e, no ultimo, encontra entradas de outro formato, como se
+passasse do fim do array.
+
+O crash ocorreu IGUAL em: multi-core, single-core recompiler e single-core
+INTERPRETADOR puro. Logo nao e erro do JIT nem concorrencia entre nucleos.
+
+Patch (assets/graphicPacks/WatchDogs_Crashfix):
+    [WatchDogs_USA_v0_MergeVisibleNodesFix]
+    moduleMatches = 0x7BC6F16F
+    0x05B6DFAC = li r3, 0
+    0x05B6DFB0 = blr
+0x05B6DFAC e o inicio da funcao (IP do crash 0x05B6E680 menos o offset 0x6D4).
+A funcao retorna na hora com r3 = 0, sem processar os blocos.
+
+Resultado: o jogo parou de cair nessa funcao e passou a mostrar o mundo (tela de
+carregamento com minimapa, depois desenho do mundo). Efeito colateral possivel
+(NAO verificado em jogo): objetos do mundo podem nao aparecer ou piscar, pois a
+lista de visibilidade deixa de ser montada.
+
+Para ativar: configuracoes do jogo > graphic packs > "Crash fix -
+MergeVisibleNodes (jogo base v0)". O log mostra "Activate graphic pack: Watch
+Dogs/Workarounds/Crash fix MergeVisibleNodes". Para desfazer: desligar o pack.
+Vale so para o modulo com checksum 0x7BC6F16F.
+
+CAUSA REAL: [HIPOTESE] o jogo base v0, sem a atualizacao, tem esse bug por conta
+propria (o log mostra o jogo tentando abrir /vol/content/patch.fat, que so
+existe com a atualizacao). NAO foi possivel testar com a atualizacao porque ela
+nao esta disponivel. Nao e garantido que o Wii U real tambem caia ali.
+
+
+6. HIPOTESES TESTADAS E DESCARTADAS PARA O CRASH DO ITEM 5
+--------------------------------------------------------------------------------
+Todas com log valido, driver Turnip v27, chaves de teste conferidas:
+
+  [DESCARTADO] Ordem de memoria do ARM          ordenacao estrita ligada: crash igual
+  [DESCARTADO] Outra thread sobrescrevendo o    analise de sobreposicao: 0 sobreposicoes
+               Locked Cache do mesmo nucleo
+  [DESCARTADO] Leitura de arquivo caindo em     registro de leituras com destino: nenhuma
+               cima do buffer                   sobreposicao
+  [DESCARTADO] psq_l/psq_st (quantizado) do JIT funcoes com psq no interpretador: igual
+  [DESCARTADO] Concorrencia entre nucleos       single-core: crash igual
+  [DESCARTADO] JIT inteiro                      interpretador puro: crash igual
+  [DESCARTADO] NaN -> inteiro (ARM x x86)       corrigido nos dois backends: crash igual
+  [DESCARTADO] DLC v16 sobre base v0            DLC nao montado: crash igual
+  [DESCARTADO] Locked Cache "indisponivel"      o jogo nao checa LCHardwareIsAvailable
+  [DESCARTADO] Atrito de tempo                  30 s reais = 30 s emulados (razao 1.000)
+  [DESCARTADO] Leitura do .wua acima de 2 GB    ZArchiveFdStreamBuf usa pread de 64 bits
+                                                (so revisao de codigo, nao testado com dados)
+
+A correcao do NaN (fctiwz/fctiw devolvem 0x80000000 para NaN, como o PowerPC; o
+fcvtzs do ARM da 0) fica no codigo porque e fiel ao PowerPC, mas nao mudou o
+crash.
+
+
+7. OUTRAS CORRECOES FEITAS NO CAMINHO
+--------------------------------------------------------------------------------
+ a) Vigia de memoria (coreinit_Thread.cpp): a leitura sem pausa ocupava ~100% de
+    um nucleo ("DefaultDispatch" nos logs) e esquentava o aparelho. Voltou a
+    dormir 150 us. [PROVADO pela correlacao diag_guest_watch=1 x CPU]
+ b) OSSleepTicks com piso de 100 us: a thread de video (Bink) fazia ~117 milhoes
+    de chamadas em 2 min num laco de espera. Chave "Desligar o piso do
+    OSSleepTicks". [PROVADO a contagem; ganho de desempenho nao medido]
+ c) Textos de diagnostico de mutex (coreinit_Synchronization.cpp) so com o Vigia
+    ligado: um crash vinha da formatacao dessa mensagem.
+ d) Mutex global de criacao de pipelines Vulkan (VulkanPipelineCompiler.cpp): a
+    thread de render esperava nele enquanto uma thread assincrona compilava um
+    pipeline de 12 a 19 s (fps 0,28). Agora a thread de render usa try_lock e,
+    se ocupado, pula o desenho (como um pipeline ainda nao compilado).
+ e) "Loading cached pipelines" parado em ~97%: de 324 pipelines, 323 levam ~10 s no
+    total e UM leva 18,7 s. O emulador agora grava os pipelines que levam >= 4 s
+    (shaderCache/transferable/<titulo>_vkslowpipelines.txt) e PULA esses na
+    pre-carga das proximas aberturas (VulkanPipelineStableCache.cpp). Na primeira
+    abertura ainda espera. [NAO TESTADO em jogo]
+ f) Atraso de partida da thread de arquivos tambem em single-core (item 3).
+
+
+8. FERRAMENTAS DE DIAGNOSTICO ADICIONADAS (no log de crash e na aba Logs)
+--------------------------------------------------------------------------------
+ - [Escalonador] ultimas trocas de thread por nucleo, com nomes e tempo.
+ - [Threads] foto de todas as threads do jogo (estado, PC/LR com nome de funcao,
+   pilha de chamadas) no instante do crash.
+ - Historico de entradas no JIT com nome da funcao e tempo (1024 entradas).
+ - [Analise] IP/LR/CTR com simbolos; busca de escritores estaticos de globais.
+ - [Memoria] conteudo da memoria apontada pelos registradores; ultimas operacoes
+   de DMA do Locked Cache com a thread que fez cada uma; ultimas leituras de
+   arquivo com destino; [LockedCache] analise de sobreposicao.
+ - [HLE] 1a chamada de cada funcao do sistema (r3..r6, texto, retorno); resumo a
+   cada 30 s; as 40 mais chamadas no crash. [Tempo] tempo emulado x real.
+ - [FS] resumo de leituras por arquivo a cada 15 s.
+ - [RT] novo alvo de COR/PROFUNDIDADE (tamanho e formato), para montar packs de
+   resolucao.
+ - [Desenhos] ultimos 24 desenhos enviados ao Vulkan (indices, instancias, tipo de
+   indice, shaders), no crash do driver.
+ - Chaves de teste na aba Logs e Diagnostico: ordenacao estrita de memoria, teste
+   do JIT (faixas no interpretador), quantum das threads, Locked Cache
+   indisponivel, JIT sem psq, nao montar DLC, liberar buffers de upload Vulkan
+   mais cedo (desligada por padrao), desligar atraso/piso de sleep.
+
+
+9. SITUACAO ATUAL E PONTOS EM ABERTO
+--------------------------------------------------------------------------------
+ a) Com o crashfix, o jogo desenha o mundo, mas em 2 de 2 rodadas seguintes caiu
+    com SIGTRAP na LatteThread, dentro do driver, em vkCmdBindIndexBuffer e
+    vkCmdDrawIndexed (frames ~2745 e ~2915, cerca de 3 min). Hipotese [HIPOTESE]:
+    com a funcao de visibilidade desligada o jogo manda desenhos com parametros
+    invalidos que o driver recusa. O log de crash agora traz [Desenhos] para
+    confirmar.
+ b) Desempenho baixo (fps de 0,3 a 30) e aquecimento (77-79 C, throttling): o cache
+    AOT do JIT esta em 0% de acertos depois das mudancas de codigo (55 mil funcoes
+    recompilando), e ha compilacao de shaders/pipelines em paralelo. O AOT deve
+    voltar a 96-99% depois de algumas aberturas.
+ c) Memoria: RAM livre ~900 MB, swap ~2,6 GB; a memoria de video do Vulkan chegou a
+    2,1 GB com buffers de upload (a chave de liberar mais cedo nao e padrao).
+ d) A causa do item 5 continua desconhecida. Se a atualizacao do jogo for obtida,
+    o primeiro teste e jogar sem o crashfix.
+ e) Pedidos futuros: graphic packs de resolucao, sombras, reflexos, distancia de
+    visao. Resolucao/sombras/reflexos por tamanho de alvo de render dependem da
+    lista [RT]; distancia de visao exige endereco no codigo do jogo (nao
+    disponivel).
+
+
+10. COMO REPRODUZIR O ESTADO ATUAL
+--------------------------------------------------------------------------------
+ 1) Build com o zip de correcao aplicado.
+ 2) Turnip v27.0.0-R2-Oneui; modo Multi-core recompiler (ou single-core).
+ 3) Ativar o graphic pack "Crash fix - MergeVisibleNodes (jogo base v0)".
+ 4) Chaves de teste desligadas (padrao); Vigia desligado.
+ 5) Conferir no log: "[Heap] ... [alinhado OK]", "Update: Not present",
+    "Activate graphic pack: Watch Dogs/Workarounds/Crash fix MergeVisibleNodes".
+
+
+11. ARQUIVOS ALTERADOS
+--------------------------------------------------------------------------------
+ MMU.cpp (item 2)                       coreinit_MEM_ExpHeap.cpp (log do heap)
+ coreinit_Thread.cpp (itens 3, 7a, 7b)  coreinit_Synchronization.cpp (7c)
+ VulkanPipelineCompiler.cpp (7d)        VulkanPipelineStableCache.cpp (7e)
+ VulkanRendererCore.cpp ([Desenhos])    LatteRenderTarget.cpp ([RT])
+ PPCInterpreterFPU.cpp, BackendAArch64.cpp (NaN)
+ PPCInterpreterHLE.cpp ([HLE]), iosu_fsa.cpp ([FS])
+ coreinit_LockedCache.cpp, CafeSystem.cpp, GameProfile.cpp, PPCState.h,
+ PPCRecompiler.cpp, PPCRecompilerImlGenFPU.cpp, DiagnosticsFlags.h,
+ ExceptionHandler_posix.cpp, NativeSettings.kt, LogsSettingsScreen.kt
+ assets/graphicPacks/WatchDogs_Crashfix + version.txt

@@ -585,6 +585,7 @@ std::string LCDiag_GetRecentOps(uint32_t maxEntries, uint32_t& lastStoreDst, uin
 std::string AndroidFsDiag_ReadsCovering(uint32_t addr);       // iosu_fsa.cpp
 std::string AndroidFsDiag_RecentReads(uint32_t maxEntries);    // iosu_fsa.cpp
 void AndroidHleCensus_DumpToCrashLog();                         // PPCInterpreterHLE.cpp
+void AndroidVkDrawRing_Dump();                                // VulkanRendererCore.cpp
 #endif
 
 // Mandacaru: para cada registrador com valor que parece um endereco valido do Wii U (RAM ou Locked Cache), mostra o conteudo da memoria
@@ -758,6 +759,7 @@ static void CrashPrintGuestDetails(PPCInterpreter_t* h, siginfo_t* info)
 	CrashDumpRegisterTargets(h);
 #if defined(__ANDROID__)
 	AndroidHleCensus_DumpToCrashLog();
+	AndroidVkDrawRing_Dump();
 #endif
 	uint32_t sp = h->gpr[1];
 	for (int depth = 0; depth < 16; depth++)

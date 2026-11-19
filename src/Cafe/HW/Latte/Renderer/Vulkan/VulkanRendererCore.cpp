@@ -1,3 +1,6 @@
+#include <atomic>
+#include <chrono>
+#include "Common/ExceptionHandler/ExceptionHandler.h"
 #include "config/CemuConfig.h" // V11.46
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanRenderer.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/CrashCrumb.h"
@@ -1824,8 +1827,56 @@ void VulkanRenderer::draw_execute_continued(uint32 baseVertex, uint32 baseInstan
 	LatteStreamout_FinishDrawcall(m_useHostMemoryForCache);
 }
 
+#if defined(__ANDROID__)
+// ---- Mandacaru: anel com os ULTIMOS DESENHOS enviados ao Vulkan (para o log de crash) ----
+// O driver Turnip derrubou o app com SIGTRAP em vkCmdBindIndexBuffer/vkCmdDrawIndexed (frame ~2800). Os parametros do desenho (contagem de
+// indices absurda, tipo de indice, endereco do indice, shaders) mostram se o jogo mandou um desenho invalido (ex.: com a funcao
+// MergeVisibleNodes do contorno desligada, listas de objetos visiveis podem conter lixo).
+struct AndroidVkDrawEntry
+{
+	uint64 ns = 0;
+	uint32 drawCounter = 0, baseVertex = 0, baseInstance = 0, instanceCount = 0, count = 0, indexMptr = 0, indexType = 0, first = 0, primMode = 0;
+	uint64 vsHash = 0, psHash = 0;
+};
+static AndroidVkDrawEntry s_androidVkDrawRing[64];
+static std::atomic<uint32> s_androidVkDrawPos{0};
+
+void AndroidVkDrawRing_Dump()
+{
+	const uint32 total = s_androidVkDrawPos.load();
+	const uint32 n = total < 64 ? total : 64;
+	CrashLog_WriteLine(fmt::format("[Desenhos] --- ultimos {} desenhos enviados ao Vulkan (de {}; o mais recente por ultimo) ---", n < 24 ? n : 24, total));
+	const uint64 lastNs = total ? s_androidVkDrawRing[(total - 1) % 64].ns : 0;
+	for (uint32 i = (n < 24 ? n : 24); i > 0; i--)
+	{
+		const AndroidVkDrawEntry& e = s_androidVkDrawRing[(total - i) % 64];
+		CrashLog_WriteLine(fmt::format("[Desenhos]   #{} -{:.2f}ms indices={} instancias={} baseVertex={} baseInstance={} tipoIndice={} indiceMPTR={:08x} primeiro={} prim={} VS={:016x} PS={:016x}",
+			e.drawCounter, (double)(lastNs - e.ns) / 1.0e6, e.count, e.instanceCount, (sint32)e.baseVertex, e.baseInstance, e.indexType, e.indexMptr, e.first, e.primMode, e.vsHash, e.psHash));
+	}
+}
+#endif
+
 void VulkanRenderer::draw_execute(uint32 baseVertex, uint32 baseInstance, uint32 instanceCount, uint32 count, MPTR indexDataMPTR, Latte::LATTE_VGT_DMA_INDEX_TYPE::E_INDEX_TYPE indexType, const LatteDrawcallContext& drawcallContext)
 {
+#if defined(__ANDROID__)
+	{
+		AndroidVkDrawEntry& e = s_androidVkDrawRing[s_androidVkDrawPos.fetch_add(1) % 64];
+		e.ns = (uint64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		e.drawCounter = (uint32)LatteGPUState.drawCallCounter;
+		e.baseVertex = baseVertex;
+		e.baseInstance = baseInstance;
+		e.instanceCount = instanceCount;
+		e.count = count;
+		e.indexMptr = indexDataMPTR;
+		e.indexType = (uint32)indexType;
+		e.first = drawcallContext.isFirst ? 1 : 0;
+		e.primMode = (uint32)LatteGPUState.contextNew.VGT_PRIMITIVE_TYPE.get_PRIMITIVE_MODE();
+		LatteDecompilerShader* vsDiag = LatteSHRC_GetActiveVertexShader();
+		LatteDecompilerShader* psDiag = LatteSHRC_GetActivePixelShader();
+		e.vsHash = vsDiag ? (uint64)vsDiag->baseHash : 0;
+		e.psHash = psDiag ? (uint64)psDiag->baseHash : 0;
+	}
+#endif
 	if (drawcallContext.isFirst)
 		draw_execute_first(baseVertex, baseInstance, instanceCount, count, indexDataMPTR, indexType, drawcallContext);
 	else

@@ -33,11 +33,70 @@ VulkanPipelineStableCache& VulkanPipelineStableCache::GetInstance()
 	return g_vkPipelineStableCacheInstance;
 }
 
+#if defined(__ANDROID__)
+// ---- Mandacaru: PIPELINES LENTOS ----
+// No Turnip alguns pipelines levam 12 a 19 s para compilar (visto no log: tempo=18742ms). Como o projeto serializa a criacao de pipelines
+// (mutex global), a tela "Loading cached pipelines" fica parada em ~97% esperando esse unico pipeline. Aqui o emulador APRENDE quais sao:
+// todo pipeline que leva >= 4 s e gravado em <titulo>_vkslowpipelines.txt (VS PS GS, hexadecimal) e, nas proximas aberturas, a pre-carga
+// PULA esses pipelines (eles so serao compilados quando o jogo realmente precisar deles, em segundo plano).
+#include <set>
+#include <tuple>
+#include <fstream>
+#include <atomic>
+static std::mutex s_slowPipelinesMutex;
+static std::set<std::tuple<uint64, uint64, uint64>> s_slowPipelines;
+static fs::path s_slowPipelinesPath;
+static std::atomic<uint32> s_slowPipelinesSkipped{0};
+
+static void VkSlowPipelines_Load(const fs::path& path)
+{
+	std::lock_guard<std::mutex> lk(s_slowPipelinesMutex);
+	s_slowPipelinesPath = path;
+	s_slowPipelines.clear();
+	std::ifstream f(path);
+	std::string vs, ps, gs;
+	while (f >> vs >> ps >> gs)
+	{
+		try
+		{
+			s_slowPipelines.emplace(std::stoull(vs, nullptr, 16), std::stoull(ps, nullptr, 16), std::stoull(gs, nullptr, 16));
+		}
+		catch (...)
+		{
+		}
+	}
+	cemuLog_log(LogType::Force, "[Pipeline] lista de pipelines lentos: {} conhecido(s) (serao pulados na pre-carga)", s_slowPipelines.size());
+}
+
+static bool VkSlowPipelines_IsSlow(uint64 vs, uint64 ps, uint64 gs)
+{
+	std::lock_guard<std::mutex> lk(s_slowPipelinesMutex);
+	return s_slowPipelines.find(std::make_tuple(vs, ps, gs)) != s_slowPipelines.end();
+}
+
+// chamado por PipelineCompiler::Compile (VulkanPipelineCompiler.cpp)
+void VkSlowPipelines_Record(uint64 vs, uint64 ps, uint64 gs, long long ms)
+{
+	std::lock_guard<std::mutex> lk(s_slowPipelinesMutex);
+	if (!s_slowPipelines.emplace(vs, ps, gs).second)
+		return;
+	cemuLog_log(LogType::Force, "[Pipeline] LENTO: VS={:016x} PS={:016x} GS={:016x} levou {} ms; sera pulado na pre-carga da proxima vez", vs, ps, gs, ms);
+	if (s_slowPipelinesPath.empty())
+		return;
+	std::ofstream f(s_slowPipelinesPath, std::ios::app);
+	f << fmt::format("{:016x} {:016x} {:016x}\n", vs, ps, gs);
+}
+#endif
+
 uint32 VulkanPipelineStableCache::BeginLoading(uint64 cacheTitleId)
 {
 	std::error_code ec;
 	fs::create_directories(ActiveSettings::GetCachePath("shaderCache/transferable"), ec);
 	const auto pathCacheFile = ActiveSettings::GetCachePath("shaderCache/transferable/{:016x}_vkpipeline.bin", cacheTitleId);
+#if defined(__ANDROID__)
+	VkSlowPipelines_Load(ActiveSettings::GetCachePath("shaderCache/transferable/{:016x}_vkslowpipelines.txt", cacheTitleId));
+	s_slowPipelinesSkipped = 0;
+#endif
 	
 	// init cache loader state
 	g_vkCacheState.pipelineLoadIndex = 0;
@@ -247,6 +306,23 @@ void VulkanPipelineStableCache::LoadPipelineFromCache(std::span<uint8> fileData)
 		s_spinlockSharedInternal.unlock();
 		return;
 	}
+#if defined(__ANDROID__)
+	// Mandacaru: pipeline conhecido como LENTO (>= 4 s no Turnip): nao compila na pre-carga. Fica sem marcar como "em cache", entao o jogo o
+	// compila sob demanda (em segundo plano) se algum dia precisar dele.
+	if (VkSlowPipelines_IsSlow(cachedPipeline->vsHash.isPresent ? (uint64)cachedPipeline->vsHash.baseHash : 0ull,
+							   cachedPipeline->psHash.isPresent ? (uint64)cachedPipeline->psHash.baseHash : 0ull,
+							   cachedPipeline->gsHash.isPresent ? (uint64)cachedPipeline->gsHash.baseHash : 0ull))
+	{
+		const uint32 n = ++s_slowPipelinesSkipped;
+		if (n <= 20)
+			cemuLog_log(LogType::Force, "[Pipeline] pre-carga PULOU o pipeline lento #{} (VS={:016x} PS={:016x})", n, (uint64)cachedPipeline->vsHash.baseHash, (uint64)cachedPipeline->psHash.baseHash);
+		s_spinlockSharedInternal.lock();
+		delete lcr;
+		delete cachedPipeline;
+		s_spinlockSharedInternal.unlock();
+		return;
+	}
+#endif
 	// restored register view from compacted state
 	Latte::LoadGPURegisterState(*lcr, cachedPipeline->gpuState);
 

@@ -21,6 +21,10 @@
 #include <array>
 #include <unordered_map>
 
+#if defined(__ANDROID__)
+void VkSlowPipelines_Record(uint64 vs, uint64 ps, uint64 gs, long long ms); // VulkanPipelineStableCache.cpp
+#endif
+
 // V11.37: guarda os hashes (VS/PS/GS) de cada PipelineCompiler para logar a criacao do pipeline.
 // Serve para cruzar a hora desta linha com "Shader compilation failed" do logcat (AdrenoVK).
 namespace
@@ -1074,6 +1078,10 @@ bool PipelineCompiler::Compile(bool forceCompile, bool isRenderThread, bool show
 		const auto pcMs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - pcT0).count();
 		// V11.37: a hora desta linha (fim da criacao) deve bater com "AdrenoVK ... Shader compilation failed" no logcat
 		cemuLog_log(LogType::Force, "[Pipeline] criado VS={:016x} PS={:016x} GS={:016x} resultado={} tempo={}ms thread={}", pcHashes[0], pcHashes[1], pcHashes[2], (sint32)result, (long long)pcMs, isRenderThread ? "render" : "async");
+#if defined(__ANDROID__)
+		if (pcHaveHashes && pcMs >= 4000)
+			VkSlowPipelines_Record(pcHashes[0], pcHashes[1], pcHashes[2], (long long)pcMs);
+#endif
 		lock.unlock();
 		if (result != VK_ERROR_OUT_OF_DEVICE_MEMORY)
 			break;
