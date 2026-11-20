@@ -1,0 +1,49 @@
+[Definition]
+titleIds = 0005000010142000
+name = Shadow Quality
+path = "Watch Dogs/Graphics/Shadow quality"
+description = Reduz a resolucao dos mapas de sombra (alvos de profundidade quadrados de 1280x1280 e 720x720, e os de 256x256 das luzes). Sombras mais "serrilhadas" em troca de menos GPU e memoria. Montado a partir dos alvos de render medidos nos logs (lista [RT]); a identificacao desses alvos como mapas de sombra e uma INFERENCIA pelo formato e tamanho. NAO foi testado em jogo.
+version = 7
+
+[Preset]
+name = Padrao (original)
+$shadowSize = 1280
+
+[Preset]
+name = Media (75%)
+$shadowSize = 960
+
+[Preset]
+name = Baixa (50%)
+$shadowSize = 640
+
+[Preset]
+name = Muito baixa (25%)
+$shadowSize = 320
+
+# --- Mapa de sombra principal 1280x1280 ---
+[TextureRedefine]
+width = 1280
+height = 1280
+formats = 0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = $shadowSize
+overwriteHeight = $shadowSize
+
+# --- Mapa de sombra 720x720 ---
+[TextureRedefine]
+width = 720
+height = 720
+formats = 0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = ($shadowSize/1280) * 720
+overwriteHeight = ($shadowSize/1280) * 720
+
+# --- Sombras de luzes 256x256 ---
+[TextureRedefine]
+width = 256
+height = 256
+formats = 0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = ($shadowSize/1280) * 256
+overwriteHeight = ($shadowSize/1280) * 256

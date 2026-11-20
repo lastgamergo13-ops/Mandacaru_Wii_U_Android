@@ -1,0 +1,122 @@
+[Definition]
+titleIds = 0005000010142000
+name = Resolution
+path = "Watch Dogs/Graphics/Resolution"
+description = Muda a resolucao interna do jogo (o original e 1280x720; a cena 3D e desenhada em 1152x648). Os presets menores aliviam a GPU e a memoria do celular. Montado a partir dos alvos de render medidos nos logs do Mandacaru (lista [RT]). NAO foi testado em jogo: se aparecer artefato (efeito faltando, imagem partida, tela preta), use o preset 1280x720 (Padrao).
+version = 7
+
+[Preset]
+name = 1280x720 (Padrao)
+$width = 1280
+$height = 720
+$gameWidth = 1280
+$gameHeight = 720
+
+# Desempenho (recomendado para celular)
+
+[Preset]
+name = 1024x576
+$width = 1024
+$height = 576
+$gameWidth = 1280
+$gameHeight = 720
+
+[Preset]
+name = 960x540
+$width = 960
+$height = 540
+$gameWidth = 1280
+$gameHeight = 720
+
+[Preset]
+name = 800x450
+$width = 800
+$height = 450
+$gameWidth = 1280
+$gameHeight = 720
+
+[Preset]
+name = 640x360
+$width = 640
+$height = 360
+$gameWidth = 1280
+$gameHeight = 720
+
+# Maior qualidade
+
+[Preset]
+name = 1600x900
+$width = 1600
+$height = 900
+$gameWidth = 1280
+$gameHeight = 720
+
+[Preset]
+name = 1920x1080
+$width = 1920
+$height = 1080
+$gameWidth = 1280
+$gameHeight = 720
+
+# --- Imagem final / HUD (1280x720) ---
+[TextureRedefine]
+width = 1280
+height = 720
+formats = 0x011,0x811,0x820,0x01a,0x41a
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 1280
+overwriteHeight = ($height/$gameHeight) * 720
+
+# --- Cena 3D em 1152x656 (cor) ---
+[TextureRedefine]
+width = 1152
+height = 656
+formats = 0x01a,0x41a,0x820,0x80e
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 1152
+overwriteHeight = ($height/$gameHeight) * 656
+
+# --- Cena 3D em 1152x648 (profundidade) ---
+[TextureRedefine]
+width = 1152
+height = 648
+formats = 0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 1152
+overwriteHeight = ($height/$gameHeight) * 648
+
+# --- Meia resolucao 576x336 (cor) ---
+[TextureRedefine]
+width = 576
+height = 336
+formats = 0x01a,0x41a,0x820,0x80e
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 576
+overwriteHeight = ($height/$gameHeight) * 336
+
+# --- Meia resolucao 576x324 (profundidade) ---
+[TextureRedefine]
+width = 576
+height = 324
+formats = 0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 576
+overwriteHeight = ($height/$gameHeight) * 324
+
+# --- Um quarto de resolucao 288x176 ---
+[TextureRedefine]
+width = 288
+height = 176
+formats = 0x01f,0x01a,0x820
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 288
+overwriteHeight = ($height/$gameHeight) * 176
+
+# --- Passe intermediario 864x480 (cor e profundidade) ---
+[TextureRedefine]
+width = 864
+height = 480
+formats = 0x01a,0x011,0x811
+tileModesExcluded = 0x1
+overwriteWidth = ($width/$gameWidth) * 864
+overwriteHeight = ($height/$gameHeight) * 480
