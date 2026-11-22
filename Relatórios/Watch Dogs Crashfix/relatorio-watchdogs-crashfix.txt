@@ -235,3 +235,71 @@ crash.
  PPCRecompiler.cpp, PPCRecompilerImlGenFPU.cpp, DiagnosticsFlags.h,
  ExceptionHandler_posix.cpp, NativeSettings.kt, LogsSettingsScreen.kt
  assets/graphicPacks/WatchDogs_Crashfix + version.txt
+
+12. ATUALIZACAO (rodadas seguintes ao crashfix)
+--------------------------------------------------------------------------------
+ a) PRE-CARGA DE PIPELINES: a lista de pipelines lentos FUNCIONOU.       [PROVADO]
+    1a abertura: 658 pipelines da pre-carga somaram 255 s (maior 21 s).
+    2a abertura (lista com 30 pipelines conhecidos, 20 pulados): 655 pipelines
+    somaram 10,8 s. Quase todos os lentos usam so dois pixel shaders
+    (PS=f753d27b35763134 e PS=1a17b00f43153043). Os pulados so compilam se o jogo
+    precisar deles (em segundo plano, 10 a 16 s cada, vistos como "async").
+    Novos lentos continuam sendo aprendidos a cada abertura (5 na 2a).
+ b) CACHE AOT DO JIT voltou a 96-99% de acertos (do_cache=74898).        [PROVADO]
+ c) CRASH NO DRIVER (SIGTRAP na LatteThread) continua, frames ~1634 a ~2915:
+    - Nos 4 logs o pc do trap e o MESMO (0x708875a38c), dentro do driver Turnip,
+      com x2=5 constante: e uma verificacao interna do driver (assert), nao um
+      acesso de memoria.                                                [PROVADO]
+    - O anel [Desenhos] mostra desenhos NORMAIS antes do crash (centenas de
+      indices, 1 instancia, tipos de indice validos, shaders conhecidos).
+      A hipotese "lixo vindo da visibilidade desligada" NAO se sustenta. [DESCARTADO]
+    - Memoria de video do Vulkan pequena (592 MB), RAM livre 800-1200 MB, swap
+      2,4-3,2 GB, temperatura de CPU 71-83 C (83,4 C no crash do segundo log).
+    - Hipotese: bug/assert do Turnip v27.0.0-R2 (build customizada) sob pressao de
+      memoria e calor.                                                   [HIPOTESE]
+    - Proximo teste sugerido: outra versao do Turnip (v26.1, T19, TurnipZ) e/ou
+      resolucao menor (pack abaixo) para reduzir memoria e calor.
+ d) PACKS DE QUALIDADE (assets/graphicPacks), montados da lista [RT]:
+    Alvos de render medidos: cena 3D 1152x656 (cor) e 1152x648 (profundidade,
+    90% de 1280x720); imagem final 1280x720; meia resolucao 576x336/576x324; um
+    quarto 288x176; passe 864x480; mapas de sombra provaveis (profundidade
+    quadrada) 1280x1280, 720x720 e 256x256; alvos pequenos fixos (96x48, 160x81,
+    128x128...) NAO sao redimensionados.
+    - WatchDogs_Resolution: presets 640x360, 800x450, 960x540, 1024x576, 1280x720
+      (padrao), 1600x900, 1920x1080 por TextureRedefine.
+    - WatchDogs_ShadowQuality: presets Padrao, Media, Baixa e Muito baixa nos mapas
+      de sombra (identificacao dos alvos como sombra e INFERENCIA).
+    NAO TESTADOS em jogo. Nao ha packs de reflexo (os alvos de reflexo nao puderam
+    ser identificados) nem de distancia de visao (exige endereco no codigo do
+    jogo, que nao temos). FPS++ nao se aplica: o jogo ja pede GX2SetSwapInterval(1)
+    e o limite hoje e o desempenho do emulador.
+
+13. ATUALIZACAO (packs, FPS e simbolos)
+--------------------------------------------------------------------------------
+ a) POR QUE OS PACKS NAO APARECIAM: o Cemu rejeitou WatchDogs_Resolution e
+    WatchDogs_ShadowQuality com a mensagem "contains preset variables which are
+    not defined in the [Default] section". Faltava a secao [Default] com os
+    valores padrao das variaveis dos presets.                          [PROVADO]
+    Corrigido. Tambem reorganizados em pastas aninhadas, como o BreathOfTheWild:
+        WatchDogs/Workarounds/Crashfix      WatchDogs/Graphics/Resolution
+        WatchDogs/Graphics/ShadowQuality    WatchDogs/Graphics/FPSLimit
+    O app apaga as pastas antigas (WatchDogs_Crashfix, WatchDogs_Resolution,
+    WatchDogs_ShadowQuality) ao reextrair os packs (CemuApplication.kt), para nao
+    duplicar.
+ b) FPS LIMIT (novo pack): usa o mecanismo do Cemu [Control] vsyncFrequency com
+    presets de 15 a 60 FPS. O jogo pede GX2SetSwapInterval(1); o pack muda a
+    frequencia do vsync emulado. Nao testado; algumas coisas do jogo podem estar
+    presas ao numero de quadros.                                      [NAO TESTADO]
+ c) CRASH DE DRIVER (SIGTRAP): nos 5 logs, os 24 ultimos desenhos tem
+    primeiro=1 (cada desenho e uma sequencia nova de estado) e o par de vertex
+    shaders VS=dfb3201f7bd9xxxx / f32b2ace64b1xxxx com PS=5afa0ee306e22c33 (ou
+    4fa59d08ac5ad353) aparece nos dois ultimos desenhos em 4 de 5 crashes.
+    O pc do trap e o mesmo. Mais indicio de assert do driver Turnip com esses
+    pipelines do que de dado ruim.                                    [HIPOTESE]
+ d) SIMBOLOS E CODIGO PARA CRIAR PATCHES: o modulo duniademo traz nomes de funcoes
+    e variaveis. Novo log [Simbolos]: 25 s apos o inicio, grava todos os simbolos
+    em <dados>/simbolos/<titulo>_simbolos.txt e escreve no log, por palavra-chave
+    (distance, shadow, lod, fov, fps, ...), os nomes com endereco e, para
+    variaveis, o valor atual. Se existir <dados>/simbolos/dump_request.txt (linhas
+    "0xENDERECO" ou "nome:Trecho"), o codigo PowerPC dessas funcoes sai no log
+    ([Codigo]) e em <titulo>_codigo.txt. Base para patches de distancia de visao.

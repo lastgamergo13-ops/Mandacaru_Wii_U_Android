@@ -5,6 +5,9 @@ path = "Watch Dogs/Graphics/Shadow quality"
 description = Reduz a resolucao dos mapas de sombra (alvos de profundidade quadrados de 1280x1280 e 720x720, e os de 256x256 das luzes). Sombras mais "serrilhadas" em troca de menos GPU e memoria. Montado a partir dos alvos de render medidos nos logs (lista [RT]); a identificacao desses alvos como mapas de sombra e uma INFERENCIA pelo formato e tamanho. NAO foi testado em jogo.
 version = 7
 
+[Default]
+$shadowSize = 1280
+
 [Preset]
 name = Padrao (original)
 $shadowSize = 1280

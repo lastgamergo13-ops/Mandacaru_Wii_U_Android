@@ -5,6 +5,12 @@ path = "Watch Dogs/Graphics/Resolution"
 description = Muda a resolucao interna do jogo (o original e 1280x720; a cena 3D e desenhada em 1152x648). Os presets menores aliviam a GPU e a memoria do celular. Montado a partir dos alvos de render medidos nos logs do Mandacaru (lista [RT]). NAO foi testado em jogo: se aparecer artefato (efeito faltando, imagem partida, tela preta), use o preset 1280x720 (Padrao).
 version = 7
 
+[Default]
+$width = 1280
+$height = 720
+$gameWidth = 1280
+$gameHeight = 720
+
 [Preset]
 name = 1280x720 (Padrao)
 $width = 1280

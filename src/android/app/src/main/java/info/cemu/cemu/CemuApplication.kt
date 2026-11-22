@@ -160,6 +160,12 @@ class CemuApplication : Application() {
             return
         }
 
+        // Pastas de packs embutidos de builds de TESTE antigos (agora reorganizadas em WatchDogs/Graphics e WatchDogs/Workarounds).
+        // Sem apagar, o mesmo pack apareceria duplicado. So estas pastas, pelo nome exato: nada do usuario e tocado.
+        for (obsolete in listOf("WatchDogs_Crashfix", "WatchDogs_Resolution", "WatchDogs_ShadowQuality")) {
+            graphicPacksFolder.resolve(obsolete).takeIf { it.isDirectory }?.deleteRecursively()
+        }
+
         for (assetFile in traverseAssets(assetsRoot)) {
             // assetFile vem como "graphicPacks/<...>"; removemos o prefixo para
             // gravar relativo à pasta graphicPacks/ real.

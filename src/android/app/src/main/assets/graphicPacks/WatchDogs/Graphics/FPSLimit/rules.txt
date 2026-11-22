@@ -1,0 +1,62 @@
+[Definition]
+titleIds = 0005000010142000
+name = FPS Limit
+path = "Watch Dogs/Graphics/FPS Limit"
+description = Muda a frequencia de vsync emulada (o limite de fps do jogo): 15, 20, 24, 25, 30, 35, 40, 45, 50 ou 60. O jogo pede 60 Hz (GX2SetSwapInterval 1), entao o limite 60 e o padrao. Limites MENORES que o fps que o emulador consegue dar deixam o ritmo mais estavel e esquentam menos. ATENCAO: algumas coisas do jogo podem estar presas ao numero de quadros (velocidade de animacoes ou da logica); se o jogo ficar em camera lenta ou acelerado, volte para 60. NAO foi testado em jogo.
+version = 6
+
+[Default]
+$targetFPS:int = 60
+
+[Preset]
+name = 60 FPS (Padrao)
+category = FPS Limit
+$targetFPS:int = 60
+
+[Preset]
+name = 50 FPS
+category = FPS Limit
+$targetFPS:int = 50
+
+[Preset]
+name = 45 FPS
+category = FPS Limit
+$targetFPS:int = 45
+
+[Preset]
+name = 40 FPS
+category = FPS Limit
+$targetFPS:int = 40
+
+[Preset]
+name = 35 FPS
+category = FPS Limit
+$targetFPS:int = 35
+
+[Preset]
+name = 30 FPS
+category = FPS Limit
+$targetFPS:int = 30
+
+[Preset]
+name = 25 FPS
+category = FPS Limit
+$targetFPS:int = 25
+
+[Preset]
+name = 24 FPS
+category = FPS Limit
+$targetFPS:int = 24
+
+[Preset]
+name = 20 FPS
+category = FPS Limit
+$targetFPS:int = 20
+
+[Preset]
+name = 15 FPS
+category = FPS Limit
+$targetFPS:int = 15
+
+[Control]
+vsyncFrequency = $targetFPS
