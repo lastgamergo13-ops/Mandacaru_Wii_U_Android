@@ -303,3 +303,37 @@ crash.
     variaveis, o valor atual. Se existir <dados>/simbolos/dump_request.txt (linhas
     "0xENDERECO" ou "nome:Trecho"), o codigo PowerPC dessas funcoes sai no log
     ([Codigo]) e em <titulo>_codigo.txt. Base para patches de distancia de visao.
+
+ e) PACKS DE RESOLUCAO E SOMBRA CARREGAM E ATIVAM: o log mostra "Activate graphic
+    pack: Watch Dogs/Graphics/Resolution [Presets: 640x360]" e "Shadow quality
+    [Presets: Muito baixa (25%)]".                                       [PROVADO]
+    O log [RT] mostra os tamanhos ORIGINAIS pedidos pelo jogo (1152x656 etc.),
+    mesmo com o pack, porque e registrado antes do TextureRedefine; nao prova que
+    o pack falhou. O efeito real no tamanho das texturas do host NAO foi medido.
+ f) Mesmo com resolucao minima e sombras a 25%, o crash do driver (SIGTRAP) veio no
+    frame 1886, com o mesmo par de shaders nos ultimos desenhos. Resolucao/sombra
+    nao evitam esse crash.                                              [PROVADO]
+ g) CACHE AOT DO JIT ESTAVA DESLIGADO NAS CONFIGURACOES nesse log ("[AOT] cache do
+    recompilador DESLIGADO nas configuracoes"): a thread PPCRecompiler ficou a
+    98% de CPU o tempo todo, o que derruba o fps e esquenta o aparelho.   [PROVADO]
+    Acao: religar o cache do recompilador nas configuracoes.
+ h) QUARENTENA ESTENDIDA (ExceptionHandler_posix.cpp, VulkanRendererCore.cpp): a
+    quarentena automatica antiga so gravava o pipeline quando o crash acontecia
+    dentro de vkCreateGraphicsPipelines. Agora, se a GPU thread estava em "Latte
+    draw: vkCmd..." quando o sinal chegou, o pipeline do ULTIMO desenho (VS/PS do
+    anel [Desenhos]) e gravado em vk_quarantine.txt e PULADO na abertura seguinte
+    (a verificacao de pipeline nulo em draw_execute_first/continued pula o
+    desenho). O jogo pode perder o objeto desse pipeline, mas nao cai ali. Cada
+    crash novo pode adicionar um pipeline; para desfazer, apagar vk_quarantine.txt.
+                                                                       [NAO TESTADO]
+
+ i) PADROES DE CONFIGURACAO (CemuConfig.h/.cpp), pedido do usuario:
+    - Cache AOT do recompilador: agora LIGADO por padrao (antes desligado).
+    - "Full sync at GX2DrawDone": agora DESLIGADO por padrao (antes ligado).
+    As chaves do settings.xml foram renomeadas para enable_recompiler_aot_cache_v2 e
+    GX2DrawdoneSync_v2. Motivo: o Cemu grava o valor atual no arquivo, entao um
+    "false"/"true" gravado so por ser o antigo padrao sobrescreveria o novo padrao
+    nas instalacoes existentes. Quem mudar de proposito depois disso mantem a
+    escolha. Efeito esperado do AOT: thread PPCRecompiler deixa de ficar a ~98% de
+    CPU depois da primeira abertura (cache anterior volta a ~96-99% de acertos).
+                                                                       [NAO TESTADO]

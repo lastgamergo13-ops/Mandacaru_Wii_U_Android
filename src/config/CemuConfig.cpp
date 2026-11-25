@@ -24,7 +24,7 @@ XMLConfigParser CemuConfig::Load(XMLConfigParser& parser)
 	advanced_iml_optimizations = parser.get("advanced_iml_optimizations", advanced_iml_optimizations.GetInitValue());
 	memory_usage_brake = parser.get("memory_usage_brake", memory_usage_brake.GetInitValue());
 	memory_ceiling_mb = parser.get("memory_ceiling_mb", memory_ceiling_mb.GetInitValue());
-	enable_recompiler_aot_cache = parser.get("enable_recompiler_aot_cache", enable_recompiler_aot_cache.GetInitValue());
+	enable_recompiler_aot_cache = parser.get("enable_recompiler_aot_cache_v2", enable_recompiler_aot_cache.GetInitValue());
 	limit_shader_compiler_threads = parser.get("limit_shader_compiler_threads", limit_shader_compiler_threads.GetInitValue());
 	limit_to_half_fps = parser.get("limit_to_half_fps", limit_to_half_fps.GetInitValue());
 	skip_depth_only_draws = parser.get("skip_depth_only_draws", skip_depth_only_draws.GetInitValue());
@@ -164,7 +164,7 @@ XMLConfigParser CemuConfig::Load(XMLConfigParser& parser)
 	userDisplayGamma = graphic.get("UserDisplayGamma", 2.2f);
 	if(userDisplayGamma < 0)
 		userDisplayGamma = 2.2f;
-	gx2drawdone_sync = graphic.get("GX2DrawdoneSync", true);
+	gx2drawdone_sync = graphic.get("GX2DrawdoneSync_v2", false);
 	upscale_filter = graphic.get("UpscaleFilter", kBicubicHermiteFilter);
 	downscale_filter = graphic.get("DownscaleFilter", kLinearFilter);
 	fsr_sharpness = graphic.get("FSRSharpness", 0.2f);
@@ -342,7 +342,7 @@ XMLConfigParser CemuConfig::Save(XMLConfigParser& parser)
 	config.set("advanced_iml_optimizations", advanced_iml_optimizations.GetValue());
 	config.set("memory_usage_brake", memory_usage_brake.GetValue());
 	config.set("memory_ceiling_mb", memory_ceiling_mb.GetValue());
-	config.set("enable_recompiler_aot_cache", enable_recompiler_aot_cache.GetValue());
+	config.set("enable_recompiler_aot_cache_v2", enable_recompiler_aot_cache.GetValue());
 	config.set("limit_shader_compiler_threads", limit_shader_compiler_threads.GetValue());
 	config.set("limit_to_half_fps", limit_to_half_fps.GetValue());
 	config.set("skip_depth_only_draws", skip_depth_only_draws.GetValue());
@@ -433,7 +433,7 @@ XMLConfigParser CemuConfig::Save(XMLConfigParser& parser)
 	graphic.set("OverrideAppGammaPreference", overrideAppGammaPreference);
 	graphic.set("OverrideGammaValue", overrideGammaValue);
 	graphic.set("UserDisplayGamma", userDisplayGamma);
-	graphic.set("GX2DrawdoneSync", gx2drawdone_sync);
+	graphic.set("GX2DrawdoneSync_v2", gx2drawdone_sync);
 #ifdef ENABLE_METAL
 	graphic.set("ForceMeshShaders", force_mesh_shaders);
 #endif

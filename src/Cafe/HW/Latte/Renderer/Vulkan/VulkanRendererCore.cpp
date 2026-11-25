@@ -1841,6 +1841,19 @@ struct AndroidVkDrawEntry
 static AndroidVkDrawEntry s_androidVkDrawRing[64];
 static std::atomic<uint32> s_androidVkDrawPos{0};
 
+// Hashes (VS, PS) do ULTIMO desenho enviado ao Vulkan. Usado pelo tratador de sinais (so leitura, sem alocar) para a quarentena de
+// pipelines que derrubam o driver DURANTE um desenho (vkCmdDrawIndexed/vkCmdBindIndexBuffer).
+bool AndroidVkDrawRing_Last(unsigned long long& vs, unsigned long long& ps)
+{
+	const uint32 total = s_androidVkDrawPos.load();
+	if (total == 0)
+		return false;
+	const AndroidVkDrawEntry& e = s_androidVkDrawRing[(total - 1) % 64];
+	vs = e.vsHash;
+	ps = e.psHash;
+	return true;
+}
+
 void AndroidVkDrawRing_Dump()
 {
 	const uint32 total = s_androidVkDrawPos.load();

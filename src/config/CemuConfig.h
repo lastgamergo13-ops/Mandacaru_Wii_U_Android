@@ -419,7 +419,10 @@ struct CemuConfig
 	// why this is more delicate than the shader cache (raw machine code isn't position
 	// independent). Off by default: still new, and any bug here means running
 	// miscompiled native code instead of just a visual glitch.
-	ConfigValue<bool> enable_recompiler_aot_cache{ false };
+	// Mandacaru: LIGADO por padrao (antes desligado). O cache AOT evita recompilar ~55 mil funcoes do jogo a cada abertura (a thread do
+	// recompilador ficava a 98% de CPU com ele desligado). A chave no settings.xml foi renomeada para enable_recompiler_aot_cache_v2 para que
+	// instalacoes antigas (que gravaram 'false' so por ser o padrao) passem a usar o novo padrao.
+	ConfigValue<bool> enable_recompiler_aot_cache{ true };
 
 	// Limitar threads do compilador de shaders: caps both shader/pipeline compiler thread pools
 	// (VulkanPipelineCompiler's organic, in-game pool and VulkanPipelineStableCache's burst
@@ -539,7 +542,8 @@ struct CemuConfig
 	ConfigValue<sint32> android_renderer_mode{ (sint32)kAndroidRendererAuto };
 
 	ConfigValue<int> vsync{ 0 }; // 0 = off, 1+ = depending on render backend
-	ConfigValue<bool> gx2drawdone_sync { true };
+	// Mandacaru: DESLIGADO por padrao (antes ligado). Chave renomeada para GX2DrawdoneSync_v2 pelo mesmo motivo do AOT.
+	ConfigValue<bool> gx2drawdone_sync { false };
 	// V11.46: pula desenhos so de profundidade (mapas de sombra / z-prepass) no OpenGL. Mais fps, sombras somem. Desligado por padrao.
 	ConfigValue<bool> skip_depth_only_draws { false };
 	ConfigValue<bool> render_upside_down{ false };

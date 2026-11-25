@@ -586,6 +586,7 @@ std::string AndroidFsDiag_ReadsCovering(uint32_t addr);       // iosu_fsa.cpp
 std::string AndroidFsDiag_RecentReads(uint32_t maxEntries);    // iosu_fsa.cpp
 void AndroidHleCensus_DumpToCrashLog();                         // PPCInterpreterHLE.cpp
 void AndroidVkDrawRing_Dump();                                // VulkanRendererCore.cpp
+bool AndroidVkDrawRing_Last(unsigned long long& vs, unsigned long long& ps); // VulkanRendererCore.cpp
 #endif
 
 // Mandacaru: para cada registrador com valor que parece um endereco valido do Wii U (RAM ou Locked Cache), mostra o conteudo da memoria
@@ -882,6 +883,37 @@ void AndroidPrintCrashContext(int sig, siginfo_t* info, void* context)
 			CrashLog_WriteLine("[Quarentena] o crash foi DENTRO de vkCreateGraphicsPipelines: pipeline gravado em vk_quarantine.txt (sera pulado na proxima abertura)");
 		}
 	}
+#if defined(__ANDROID__)
+	// Mandacaru: quarentena tambem para crash do driver DURANTE UM DESENHO (a GPU thread estava em "Latte draw: vkCmd...").
+	// Nos logs o Turnip derrubou o app com SIGTRAP em vkCmdDrawIndexed/vkCmdBindIndexBuffer, sempre com o mesmo par de shaders nos ultimos
+	// desenhos, e a quarentena antiga so cobria crash dentro de vkCreateGraphicsPipelines. Grava o pipeline do ultimo desenho em
+	// vk_quarantine.txt (mesmo formato); na proxima abertura ele e PULADO (o jogo pode perder o objeto desse pipeline, mas nao cai).
+	// So open/write/close com buffer na pilha.
+	if (CrashCrumb::g_text && strncmp(CrashCrumb::g_text, "Latte draw", 10) == 0 && CrashCrumb::g_quarantinePath[0] != 0)
+	{
+		unsigned long long drawVs = 0, drawPs = 0;
+		if (AndroidVkDrawRing_Last(drawVs, drawPs) && (drawVs != 0 || drawPs != 0))
+		{
+			char line[64];
+			const unsigned long long vals[3] = { drawVs, drawPs, 0ull };
+			int pos = 0;
+			for (int v = 0; v < 3; v++)
+			{
+				for (int shift = 60; shift >= 0; shift -= 4)
+					line[pos++] = "0123456789abcdef"[(vals[v] >> shift) & 0xF];
+				line[pos++] = (v == 2) ? '\n' : ' ';
+			}
+			int fdDraw = open(CrashCrumb::g_quarantinePath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+			if (fdDraw >= 0)
+			{
+				ssize_t writtenDraw = write(fdDraw, line, (size_t)pos);
+				(void)writtenDraw;
+				close(fdDraw);
+				CrashLog_WriteLine("[Quarentena] o crash do driver foi DURANTE UM DESENHO: o pipeline do ultimo desenho foi gravado em vk_quarantine.txt (sera pulado na proxima abertura). Para desfazer, apague esse arquivo.");
+			}
+		}
+	}
+#endif
 	// Idem para o OpenGL ES: crash dentro do compilador de shader do driver -> gl_shader_quarantine.txt (shader e pulado na proxima abertura)
 	if (CrashCrumb::g_glShaderActive && CrashCrumb::g_glQuarantinePath[0] != 0)
 	{

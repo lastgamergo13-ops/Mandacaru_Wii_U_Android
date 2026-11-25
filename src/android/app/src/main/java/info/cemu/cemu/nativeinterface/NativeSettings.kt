@@ -562,7 +562,7 @@ object NativeSettings {
     @JvmStatic
     external fun setEmulationSpeedPercent(value: Int)
 
-    // V11.45: "Full sync at GX2DrawDone" (config gx2drawdone_sync, padrao ligado)
+    // V11.45: "Full sync at GX2DrawDone" (config gx2drawdone_sync, padrao DESLIGADO desde esta versao)
     @JvmStatic
     external fun getGX2DrawDoneSync(): Boolean
 
