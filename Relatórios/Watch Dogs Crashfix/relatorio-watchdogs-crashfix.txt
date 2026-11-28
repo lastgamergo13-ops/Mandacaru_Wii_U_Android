@@ -337,3 +337,39 @@ crash.
     escolha. Efeito esperado do AOT: thread PPCRecompiler deixa de ficar a ~98% de
     CPU depois da primeira abertura (cache anterior volta a ~96-99% de acertos).
                                                                        [NAO TESTADO]
+
+14. ATUALIZACAO (Turnip R3, simbolos, FPS Limit, tela de carregamento)
+--------------------------------------------------------------------------------
+ a) FPS LIMIT FUNCIONA: com o preset 15 FPS o log mostrou fps=15.0 exatos.   [PROVADO]
+    Nao se sabe ainda se a velocidade do jogo acompanha (logica presa aos quadros).
+ b) EXPORTACAO DE SIMBOLOS FUNCIONOU: 136.014 simbolos (135.207 do modulo do jogo).
+    Candidatos encontrados (enderecos do modulo duniademo, checksum 0x7BC6F16F):
+      sombras em cascata   AddCascadeShadowsRenderJobsSmoothTransitions (0x059D9878),
+                           UpdateCascadesInfoTexture (0x059DAA20), ComputeCascadedSliceInfo
+      plano de corte       CCullingFrustum::SetFarPlaneCorners (0x05B730E0),
+                           CCinemaCameraHelper::SetCameraClipPlanes (0x04AA2CC4 / 0x04AA2DC4)
+      limite de fps        CTimer::UnlockFrameRate (0x04E74724), CTimer::GetFrameRate
+                           (0x04E746FC), CDriverScriptObject::SetMaxFrameRate (0x033BD4D4)
+      visibilidade         MergeVisibleNodesGPUVisibilityLCDMA (0x05B6DFAC, o crashfix)
+ c) TURNIP v27.0.0-R3 x R2: com o R3 e so o crashfix (sem packs de qualidade) o jogo
+    chegou ao frame 24364 (cerca de 8 min no mundo, 12,6 fps) antes do SIGTRAP no
+    vkCmdBindIndexBuffer; com o R2 o crash vinha nos frames 1634-2915. O trap e o
+    mesmo, so a demora mudou. Possivel melhora do R3 (uma amostra).         [HIPOTESE]
+ d) TELA DE CARREGAMENTO QUE NAO SOME: com o mundo carregado e o HUD visivel por tras,
+    a imagem "Loading..." continua por cima. Hipotese: o crashfix faz a funcao
+    MergeVisibleNodesGPUVisibilityLCDMA retornar sem concluir o trabalho, e o jogo
+    espera esse resultado para encerrar o carregamento.                    [HIPOTESE]
+    Proximo passo: ler o codigo completo dessa funcao (despejo automatico abaixo) e
+    trocar o remendo "retornar na hora" por um que so descarte a entrada invalida.
+ e) DESPEJO AUTOMATICO DE CODIGO: sem dump_request.txt o emulador agora despeja, no
+    log ([Codigo]) e em simbolos/<titulo>_codigo.txt, o codigo das 9 funcoes acima
+    (ate 1000 palavras cada). Com isso se monta: crashfix melhor, distancia de visao
+    e sombras de forma menos as cegas.
+ f) PACK NOVO "Shadows Off (experimental)" (WatchDogs/Graphics/ShadowsOff): a funcao de
+    sombras em cascata (0x059D9878) retorna na hora. Montado so pelo NOME do simbolo,
+    sem ler o codigo.                                                     [NAO TESTADO]
+ g) LOG: o arquivo do log agora guarda os ultimos 10 logs anteriores com data/hora no
+    nome (log_prev_AAAAMMDD_HHMMSS.txt) em vez de so 2, para nao perder o log de um
+    crash quando o jogo e aberto varias vezes seguidas. Quando o Android mata o app
+    (calor critico/memoria, sem sinal), o ultimo trecho do log pode faltar; no log 1
+    desta rodada o Thermal estava "Critical" e a RAM livre em ~120 MB.     [HIPOTESE]

@@ -175,12 +175,37 @@ void cemuLog_createLogFile(bool triggeredByCrash)
 		std::error_code ec;
 		if (fs::exists(path, ec) && fs::file_size(path, ec) > 0)
 		{
-			const fs::path prev1 = path.parent_path() / "log_prev1.txt";
-			const fs::path prev2 = path.parent_path() / "log_prev2.txt";
-			fs::remove(prev2, ec);
-			if (fs::exists(prev1, ec))
-				fs::rename(prev1, prev2, ec);
-			fs::rename(path, prev1, ec);
+			// Mandacaru: guarda os ultimos 10 logs, cada um com a data/hora da ULTIMA gravacao no nome (log_prev_AAAAMMDD_HHMMSS.txt), em vez
+			// de so 2 (log_prev1/log_prev2). Quem abre o jogo varias vezes seguidas depois de crashes perdia o log do crash mais antigo.
+			const auto lastWrite = fs::last_write_time(path, ec);
+			std::string stamp = "desconhecido";
+			if (!ec)
+			{
+				const auto sysTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(lastWrite - fs::file_time_type::clock::now() + std::chrono::system_clock::now());
+				const std::time_t tt = std::chrono::system_clock::to_time_t(sysTime);
+				std::tm tmv{};
+				localtime_r(&tt, &tmv);
+				char buf[32];
+				strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", &tmv);
+				stamp = buf;
+			}
+			fs::path prevPath = path.parent_path() / ("log_prev_" + stamp + ".txt");
+			for (int n = 2; fs::exists(prevPath, ec) && n < 50; n++)
+				prevPath = path.parent_path() / ("log_prev_" + stamp + "_" + std::to_string(n) + ".txt");
+			fs::rename(path, prevPath, ec);
+			std::vector<fs::path> olds;
+			for (const auto& entry : fs::directory_iterator(path.parent_path(), ec))
+			{
+				const std::string name = entry.path().filename().string();
+				if (name.rfind("log_prev_", 0) == 0)
+					olds.push_back(entry.path());
+			}
+			std::sort(olds.begin(), olds.end());
+			while (olds.size() > 10)
+			{
+				fs::remove(olds.front(), ec);
+				olds.erase(olds.begin());
+			}
 		}
 	}
 #endif

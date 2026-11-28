@@ -218,17 +218,30 @@ static void AndroidSymbolExportThreadMain()
 
 	// ---- pedidos de codigo (dump_request.txt) ----
 	const fs::path reqFile = dir / "dump_request.txt";
-	std::ifstream req(reqFile);
-	if (!req.is_open())
+	std::vector<std::string> requests;
 	{
-		cemuLog_log(LogType::Force, "[Simbolos] para ver o CODIGO de funcoes, crie {} com linhas como  0x05B6DFAC  ou  nome:Distance  e abra o jogo de novo", reqFile.string());
-		return;
+		std::ifstream req(reqFile);
+		if (req.is_open())
+		{
+			std::string l;
+			while (std::getline(req, l))
+				requests.push_back(l);
+		}
+		else
+		{
+			// Sem dump_request.txt: despeja por PADRAO o codigo das funcoes que interessam para os patches do Watch Dogs v0 (enderecos do modulo
+			// duniademo checksum 0x7BC6F16F): visibilidade (o crashfix), sombras em cascata, plano de corte (distancia de visao) e limite de fps.
+			cemuLog_log(LogType::Force, "[Simbolos] sem {}: despejando por padrao o codigo das funcoes de visibilidade, sombras, plano de corte e fps (crie esse arquivo para pedir outras)", reqFile.string());
+			for (const char* d : {"0x05B6DFAC", "0x05B730E0", "0x059D9878", "0x059DAA20", "0x04AA2CC4", "0x04AA2DC4", "0x04E74724", "0x04E746FC", "0x033BD4D4"})
+				requests.push_back(d);
+		}
 	}
 	std::ofstream codeOut(codeFile);
 	std::string line;
 	uint32 dumped = 0;
-	while (std::getline(req, line) && dumped < 40)
+	for (size_t reqIndex = 0; reqIndex < requests.size() && dumped < 40; reqIndex++)
 	{
+		line = requests[reqIndex];
 		while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
 			line.pop_back();
 		if (line.empty() || line[0] == '#')
@@ -258,11 +271,11 @@ static void AndroidSymbolExportThreadMain()
 			if (dumped >= 40)
 				break;
 			// fim = proximo simbolo de endereco maior
-			uint32 endAddr = t->addr + 4 * 600;
+			uint32 endAddr = t->addr + 4 * 1000;
 			auto it = std::upper_bound(syms.begin(), syms.end(), t->addr, [](uint32 a, const Sym& s) { return a < s.addr; });
 			if (it != syms.end() && it->addr < endAddr)
 				endAddr = it->addr;
-			AndroidSymDumpCode(&codeOut, t->addr, endAddr, t->name, 600, true);
+			AndroidSymDumpCode(&codeOut, t->addr, endAddr, t->name, 1000, true);
 			dumped++;
 		}
 	}

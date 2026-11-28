@@ -1,0 +1,6 @@
+[Definition]
+titleIds = 0005000010142000
+name = Shadows Off (experimental)
+path = "Watch Dogs/Graphics/Shadows Off (experimental)"
+description = EXPERIMENTAL. Desliga as sombras em cascata: a funcao CShadowMaskRenderer::AddCascadeShadowsRenderJobsSmoothTransitions (0x059D9878) passa a retornar na hora, entao nenhum mapa de sombra em cascata e renderizado (economiza muita GPU e memoria). Efeito possivel: o mundo fica sem sombras do sol, ou com sombras erradas/pretas, ou o jogo pode quebrar se o resultado dessa funcao for usado depois. Montado a partir do nome do simbolo do jogo (o codigo da funcao ainda nao foi lido). NAO foi testado. Vale so para o modulo duniademo com checksum 0x7BC6F16F.
+version = 7
